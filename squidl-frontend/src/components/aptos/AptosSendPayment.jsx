@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button, Input, Spinner } from "@nextui-org/react";
 import { useAptos } from "../../providers/AptosProvider";
-import { sendAptosStealthPayment } from "../../lib/aptos";
-import { squidlAPI } from "../../api/squidl";
+import { sendAptosStealthPayment, getAptosClient } from "../../lib/aptos";
 import toast from "react-hot-toast";
 
 /**
@@ -16,38 +15,6 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
   const [stealthAddress, setStealthAddress] = useState("");
   const [ephemeralPubKey, setEphemeralPubKey] = useState("");
 
-  // Generate stealth address (should be done off-chain)
-  const generateStealthAddress = async () => {
-    if (!recipientAddress) {
-      toast.error("Recipient address required");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // In production, this should call the off-chain helper
-      // For now, we'll use the backend API
-      const response = await squidlAPI.get(
-        `/stealth-address/aptos/meta-address/${recipientMetaIndex}`,
-        {
-          params: {
-            accountAddress: recipientAddress,
-            isTestnet: true,
-          },
-        }
-      );
-
-      // Generate stealth address using Python helper (would be done client-side)
-      toast.info("Stealth address generation should be done client-side using offchain_helper.py");
-      
-      // For demo, we'll show the form
-    } catch (error) {
-      toast.error("Failed to get recipient meta address");
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSendPayment = async () => {
     if (!stealthAddress || !ephemeralPubKey || !amount) {
@@ -73,6 +40,13 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
       toast.success("Payment sent successfully!", {
         duration: 5000,
       });
+      
+      if (result.explorerUrl) {
+        toast.success(
+          `View transaction: ${result.explorerUrl}`,
+          { duration: 10000 }
+        );
+      }
 
       // Reset form
       setAmount("");
@@ -151,4 +125,5 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
     </div>
   );
 }
+
 

@@ -33,3 +33,4 @@ echo "  - ephemeral_pub_key: Generated ephemeral public key"
 echo "  - stealth_address: Generated stealth address"
 echo ""
 
+

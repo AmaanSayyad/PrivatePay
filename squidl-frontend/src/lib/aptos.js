@@ -189,3 +189,42 @@ export const getAptosBalance = async (accountAddress, isTestnet = true) => {
   }
 };
 
+/**
+ * Get meta address from blockchain (no backend needed)
+ */
+export const getAptosMetaAddressFromChain = async ({
+  accountAddress,
+  index = 0,
+  isTestnet = true,
+}) => {
+  try {
+    const aptos = getAptosClient(isTestnet);
+    const resource = await aptos.getAccountResource({
+      accountAddress,
+      resourceType: `${APTOS_MODULE_ADDRESS}::stealth_address::PaymentRegistry`,
+    });
+
+    if (!resource || !resource.meta_addresses || index >= resource.meta_addresses.length) {
+      throw new Error("Meta address not found");
+    }
+
+    const metaAddress = resource.meta_addresses[index];
+    
+    // Convert bytes to hex
+    const bytesToHex = (bytes) => {
+      if (typeof bytes === "string") return bytes;
+      return "0x" + Array.from(bytes)
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+    };
+
+    return {
+      spendPubKey: bytesToHex(metaAddress.spend_pub_key),
+      viewingPubKey: bytesToHex(metaAddress.viewing_pub_key),
+    };
+  } catch (error) {
+    console.error("Error getting meta address from chain:", error);
+    throw error;
+  }
+};
+

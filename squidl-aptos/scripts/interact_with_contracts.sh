@@ -31,3 +31,4 @@ echo "3. View on Explorer:"
 echo "   https://explorer.aptoslabs.com/account/${MODULE_ADDRESS}?network=testnet"
 echo ""
 
+

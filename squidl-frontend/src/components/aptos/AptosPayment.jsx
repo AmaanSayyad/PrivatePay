@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Button, Input, Spinner } from "@nextui-org/react";
 import { useAptos } from "../../providers/AptosProvider";
-import { registerAptosMetaAddress, sendAptosStealthPayment } from "../../lib/aptos";
-import { squidlAPI } from "../../api/squidl";
+import { registerAptosMetaAddress } from "../../lib/aptos";
 import toast from "react-hot-toast";
 
 /**
@@ -43,16 +42,8 @@ export default function AptosPayment() {
 
     setIsLoading(true);
     try {
-      // Register on-chain
+      // Register on-chain (directly to Aptos blockchain)
       const result = await registerAptosMetaAddress({
-        accountAddress: account,
-        spendPubKey,
-        viewingPubKey,
-        isTestnet: true,
-      });
-
-      // Register in backend
-      await squidlAPI.post("/stealth-address/aptos/register-meta-address", {
         accountAddress: account,
         spendPubKey,
         viewingPubKey,
@@ -62,6 +53,14 @@ export default function AptosPayment() {
       toast.success("Meta address registered!", {
         duration: 5000,
       });
+      
+      if (result.explorerUrl) {
+        toast.success(
+          `View transaction: ${result.explorerUrl}`,
+          { duration: 10000 }
+        );
+      }
+      
       setIsRegistered(true);
     } catch (error) {
       toast.error("Failed to register meta address");
@@ -145,4 +144,5 @@ export default function AptosPayment() {
     </div>
   );
 }
+
 
