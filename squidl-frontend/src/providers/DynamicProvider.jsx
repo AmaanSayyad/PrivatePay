@@ -10,10 +10,18 @@ import Cookies from "js-cookie";
 
 export default function DynamicProvider({ children }) {
   const [, setSignedIn] = useAtom(isSignedInAtom);
+  const dynamicEnvId = import.meta.env.VITE_DYNAMIC_ENV_ID;
+
+  // If Dynamic environment ID is not set or is placeholder, skip Dynamic provider
+  if (!dynamicEnvId || dynamicEnvId === "your_dynamic_environment_id") {
+    console.warn("Dynamic.xyz environment ID not configured. Skipping Dynamic provider.");
+    return <>{children}</>;
+  }
+
   return (
     <DynamicContextProvider
       settings={{
-        environmentId: import.meta.env.VITE_DYNAMIC_ENV_ID,
+        environmentId: dynamicEnvId,
         walletConnectors: [EthereumWalletConnectors],
         overrides: {
           evmNetworks: (networks) => mergeNetworks(customEvmNetworks, networks),

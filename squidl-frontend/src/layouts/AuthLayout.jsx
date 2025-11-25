@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLoaderData } from "react-router-dom";
 import { DynamicEmbeddedWidget } from "@dynamic-labs/sdk-react-core";
 import AuthProvider from "../providers/AuthProvider";
+import RootProvider from "../providers/RootProvider";
 import { Toaster } from "react-hot-toast";
 import Header from "../components/shared/Header";
 import Navbar from "../components/shared/Navbar";

@@ -3,7 +3,7 @@ import { Toaster } from "react-hot-toast";
 
 export const RootLayout = ({ children }) => {
   return (
-    <div>
+    <div className="min-h-screen bg-primary-50">
       <Toaster />
       <LayoutGroup>{children}</LayoutGroup>
     </div>

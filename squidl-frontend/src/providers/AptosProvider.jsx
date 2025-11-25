@@ -37,7 +37,12 @@ export default function AptosProvider({ children, isTestnet = true }) {
           setIsConnected(true);
         }
       } catch (error) {
-        console.error("Error checking Aptos connection:", error);
+        // Petra wallet not installed or not available - this is OK
+        if (error.message?.includes("PetraApiError") || error.message?.includes("not found")) {
+          console.log("Aptos wallet (Petra) not installed. User can install it to use Aptos features.");
+        } else {
+          console.error("Error checking Aptos connection:", error);
+        }
       }
     };
 

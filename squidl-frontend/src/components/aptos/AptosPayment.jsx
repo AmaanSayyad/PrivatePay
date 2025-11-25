@@ -71,40 +71,42 @@ export default function AptosPayment() {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-6 max-w-md mx-auto">
-      <h2 className="text-2xl font-bold">Aptos Stealth Payment</h2>
-
+    <div className="flex flex-col gap-4 w-full">
       {/* Wallet Connection */}
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-4">
         {!isConnected ? (
           <Button
             color="primary"
             onClick={handleConnect}
-            className="w-full"
+            className="w-full h-14 rounded-full"
+            size="lg"
           >
             Connect Aptos Wallet
           </Button>
         ) : (
-          <div className="flex flex-col gap-2">
-            <div className="text-sm text-gray-600">
-              Connected: {account?.slice(0, 10)}...{account?.slice(-8)}
+          <div className="flex flex-col gap-3">
+            <div className="bg-white rounded-full w-full h-14 flex items-center justify-between pl-6 pr-2 text-black">
+              <p className="text-sm font-medium">
+                {account?.slice(0, 10)}...{account?.slice(-8)}
+              </p>
+              <Button
+                color="danger"
+                variant="light"
+                onClick={handleDisconnect}
+                size="sm"
+                className="rounded-full"
+              >
+                Disconnect
+              </Button>
             </div>
-            <Button
-              color="danger"
-              variant="light"
-              onClick={handleDisconnect}
-              size="sm"
-            >
-              Disconnect
-            </Button>
           </div>
         )}
       </div>
 
       {/* Meta Address Registration */}
       {isConnected && !isRegistered && (
-        <div className="flex flex-col gap-4 p-4 border rounded-lg">
-          <h3 className="text-lg font-semibold">Register Meta Address</h3>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-lg font-semibold text-neutral-800">Register Meta Address</h3>
           
           <Input
             label="Spend Public Key"
@@ -112,6 +114,10 @@ export default function AptosPayment() {
             value={spendPubKey}
             onChange={(e) => setSpendPubKey(e.target.value)}
             description="33 bytes compressed secp256k1 public key"
+            classNames={{
+              input: "rounded-full",
+              inputWrapper: "rounded-full",
+            }}
           />
           
           <Input
@@ -120,6 +126,10 @@ export default function AptosPayment() {
             value={viewingPubKey}
             onChange={(e) => setViewingPubKey(e.target.value)}
             description="33 bytes compressed secp256k1 public key"
+            classNames={{
+              input: "rounded-full",
+              inputWrapper: "rounded-full",
+            }}
           />
 
           <Button
@@ -127,6 +137,8 @@ export default function AptosPayment() {
             onClick={handleRegisterMetaAddress}
             isLoading={isLoading}
             disabled={!spendPubKey || !viewingPubKey}
+            className="w-full h-14 rounded-full"
+            size="lg"
           >
             Register Meta Address
           </Button>
@@ -134,8 +146,8 @@ export default function AptosPayment() {
       )}
 
       {isRegistered && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-green-800">Meta address registered successfully!</p>
+        <div className="p-4 bg-green-50 border border-green-200 rounded-3xl">
+          <p className="text-green-800 font-medium">Meta address registered successfully!</p>
           <p className="text-sm text-green-600 mt-2">
             You can now receive stealth payments on Aptos.
           </p>

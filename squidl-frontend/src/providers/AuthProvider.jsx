@@ -12,13 +12,22 @@ import toast from "react-hot-toast";
 import Cookies from "js-cookie";
 import useSWR from "swr";
 
+// Safe wrapper for useDynamicContext
+const useDynamicContextSafe = () => {
+  try {
+    return useDynamicContext();
+  } catch (error) {
+    return { handleLogOut: null, user: null, primaryWallet: null };
+  }
+};
+
 const AuthContext = createContext({
   userData: {},
 });
 
 export default function AuthProvider({ children }) {
   const { isLoaded, provider, signer } = useWeb3();
-  const { handleLogOut, user, primaryWallet } = useDynamicContext();
+  const { handleLogOut, user, primaryWallet } = useDynamicContextSafe();
   const [isReadyToSign, setIsReadyToSign] = useState(false);
   const [isSigningIn, setSigningIn] = useState(false);
   const [, setOpen] = useAtom(isGetStartedDialogAtom);

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button, Input, Spinner } from "@nextui-org/react";
 import { useAptos } from "../../providers/AptosProvider";
-import { sendAptosStealthPayment, getAptosClient } from "../../lib/aptos";
+import { sendAptosStealthPayment, getAptosClient, getAptosMetaAddressFromChain } from "../../lib/aptos";
+import { generateStealthAddress, generateEphemeralKeyPair, validatePublicKey, hexToBytes } from "../../lib/aptos/stealthAddress";
 import toast from "react-hot-toast";
 
 /**
@@ -11,10 +12,63 @@ import toast from "react-hot-toast";
 export default function AptosSendPayment({ recipientAddress, recipientMetaIndex = 0 }) {
   const { account, isConnected } = useAptos();
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [amount, setAmount] = useState("");
   const [stealthAddress, setStealthAddress] = useState("");
   const [ephemeralPubKey, setEphemeralPubKey] = useState("");
+  const [recipientSpendPubKey, setRecipientSpendPubKey] = useState("");
+  const [recipientViewingPubKey, setRecipientViewingPubKey] = useState("");
+  const [showGenerateForm, setShowGenerateForm] = useState(false);
 
+
+  const handleGenerateStealthAddress = async () => {
+    if (!recipientSpendPubKey || !recipientViewingPubKey) {
+      toast.error("Please provide both spend and viewing public keys");
+      return;
+    }
+
+    // Validate public keys
+    const spendValidation = validatePublicKey(recipientSpendPubKey);
+    const viewingValidation = validatePublicKey(recipientViewingPubKey);
+
+    if (!spendValidation.valid) {
+      toast.error(`Invalid spend public key: ${spendValidation.error}`);
+      return;
+    }
+
+    if (!viewingValidation.valid) {
+      toast.error(`Invalid viewing public key: ${viewingValidation.error}`);
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      // Generate ephemeral key pair
+      const ephemeralKeyPair = generateEphemeralKeyPair();
+      const ephemeralPrivKey = hexToBytes(ephemeralKeyPair.privateKey);
+
+      // Generate stealth address
+      const result = generateStealthAddress(
+        recipientSpendPubKey,
+        recipientViewingPubKey,
+        ephemeralPrivKey,
+        0 // k = 0
+      );
+
+      setStealthAddress(result.stealthAddress);
+      setEphemeralPubKey(result.ephemeralPubKey);
+      setShowGenerateForm(false);
+
+      toast.success("Stealth address generated successfully!", {
+        duration: 5000,
+      });
+    } catch (error) {
+      toast.error("Failed to generate stealth address");
+      console.error(error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleSendPayment = async () => {
     if (!stealthAddress || !ephemeralPubKey || !amount) {
@@ -69,8 +123,7 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6 max-w-md mx-auto">
-      <h2 className="text-2xl font-bold">Send Stealth Payment</h2>
+    <div className="flex flex-col gap-4 w-full">
 
       <div className="flex flex-col gap-4">
         <Input
@@ -78,6 +131,10 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
           value={recipientAddress || account}
           disabled
           description="Aptos account address"
+          classNames={{
+            input: "rounded-full",
+            inputWrapper: "rounded-full",
+          }}
         />
 
         <Input
@@ -87,40 +144,140 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           description="Amount in APT (will be converted to octas)"
+          classNames={{
+            input: "rounded-full",
+            inputWrapper: "rounded-full",
+          }}
         />
 
-        <Input
-          label="Stealth Address"
-          placeholder="0x..."
-          value={stealthAddress}
-          onChange={(e) => setStealthAddress(e.target.value)}
-          description="Generated stealth address (from offchain_helper.py)"
-        />
+        {/* Generate Stealth Address Section */}
+        {!stealthAddress && (
+          <div className="p-4 border rounded-3xl bg-neutral-50">
+            {!showGenerateForm ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-gray-600">
+                  Generate stealth address from recipient's meta address
+                </p>
+                <Button
+                  color="secondary"
+                  variant="bordered"
+                  onClick={() => setShowGenerateForm(true)}
+                  className="w-full h-14 rounded-full"
+                  size="lg"
+                >
+                  Generate Stealth Address
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <h3 className="text-lg font-semibold">Generate Stealth Address</h3>
+                
+                <Input
+                  label="Recipient Spend Public Key"
+                  placeholder="0x..."
+                  value={recipientSpendPubKey}
+                  onChange={(e) => setRecipientSpendPubKey(e.target.value)}
+                  description="33 bytes compressed secp256k1 public key"
+                  classNames={{
+                    input: "rounded-full",
+                    inputWrapper: "rounded-full",
+                  }}
+                />
 
-        <Input
-          label="Ephemeral Public Key"
-          placeholder="0x..."
-          value={ephemeralPubKey}
-          onChange={(e) => setEphemeralPubKey(e.target.value)}
-          description="Ephemeral public key (from offchain_helper.py)"
-        />
+                <Input
+                  label="Recipient Viewing Public Key"
+                  placeholder="0x..."
+                  value={recipientViewingPubKey}
+                  onChange={(e) => setRecipientViewingPubKey(e.target.value)}
+                  description="33 bytes compressed secp256k1 public key"
+                  classNames={{
+                    input: "rounded-full",
+                    inputWrapper: "rounded-full",
+                  }}
+                />
+
+                <div className="flex gap-2">
+                  <Button
+                    color="primary"
+                    onClick={handleGenerateStealthAddress}
+                    isLoading={isGenerating}
+                    disabled={!recipientSpendPubKey || !recipientViewingPubKey}
+                    className="flex-1 h-14 rounded-full"
+                    size="lg"
+                  >
+                    Generate
+                  </Button>
+                  <Button
+                    color="default"
+                    variant="light"
+                    onClick={() => {
+                      setShowGenerateForm(false);
+                      setRecipientSpendPubKey("");
+                      setRecipientViewingPubKey("");
+                    }}
+                    className="h-14 rounded-full"
+                    size="lg"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Manual Input (if stealth address already generated) */}
+        {stealthAddress && (
+          <>
+            <Input
+              label="Stealth Address"
+              placeholder="0x..."
+              value={stealthAddress}
+              onChange={(e) => setStealthAddress(e.target.value)}
+              description="Generated stealth address"
+              classNames={{
+                input: "rounded-full",
+                inputWrapper: "rounded-full",
+              }}
+              endContent={
+                <Button
+                  size="sm"
+                  variant="light"
+                  onClick={() => {
+                    setStealthAddress("");
+                    setEphemeralPubKey("");
+                  }}
+                  className="rounded-full"
+                >
+                  Clear
+                </Button>
+              }
+            />
+
+            <Input
+              label="Ephemeral Public Key"
+              placeholder="0x..."
+              value={ephemeralPubKey}
+              onChange={(e) => setEphemeralPubKey(e.target.value)}
+              description="Ephemeral public key"
+              classNames={{
+                input: "rounded-full",
+                inputWrapper: "rounded-full",
+              }}
+            />
+          </>
+        )}
 
         <Button
           color="primary"
           onClick={handleSendPayment}
           isLoading={isLoading}
           disabled={!stealthAddress || !ephemeralPubKey || !amount}
-          className="w-full"
+          className="w-full h-14 rounded-full"
+          size="lg"
         >
           Send Stealth Payment
         </Button>
-
-        <div className="text-xs text-gray-500 mt-2">
-          <p>Note: Stealth address and ephemeral key should be generated using:</p>
-          <code className="block mt-1 p-2 bg-gray-100 rounded">
-            python scripts/offchain_helper.py
-          </code>
-        </div>
       </div>
     </div>
   );

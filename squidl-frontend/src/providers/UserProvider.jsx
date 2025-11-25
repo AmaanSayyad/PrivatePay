@@ -7,6 +7,15 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { useListenEvent } from "../hooks/use-event";
 import { useDynamicContext } from "@dynamic-labs/sdk-react-core";
 
+// Safe wrapper for useDynamicContext
+const useDynamicContextSafe = () => {
+  try {
+    return useDynamicContext();
+  } catch (error) {
+    return { user: null, primaryWallet: null };
+  }
+};
+
 const UserContext = createContext({
   assets: {},
   address: "",
@@ -21,7 +30,7 @@ export default function UserProvider({ children }) {
   const [assets, setAssets] = useLocalStorage("user-assets", null);
   const [isAssetsLoading, setAssetsLoading] = useState(false);
   const [isAssetsRefetching, setAssetsRefetching] = useState(false);
-  const { primaryWallet } = useDynamicContext();
+  const { primaryWallet } = useDynamicContextSafe();
   const address = primaryWallet?.address;
 
   const handleFetchAssets = async () => {

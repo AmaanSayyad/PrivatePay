@@ -11,6 +11,15 @@ import ContractABI from "../abi/StealthSigner.json";
 import toast from "react-hot-toast";
 import { sleep } from "../utils/process.js";
 
+// Safe wrapper for useDynamicContext
+const useDynamicContextSafe = () => {
+  try {
+    return useDynamicContext();
+  } catch (error) {
+    return { primaryWallet: null, handleLogOut: null };
+  }
+};
+
 /**
  * @typedef {Object} Web3ContextType
  * @property {boolean} isLoaded - Indicates if the provider is loaded.
@@ -30,7 +39,7 @@ const Web3Context = createContext({
 export const useWeb3 = () => useContext(Web3Context);
 
 export default function Web3Provider({ children }) {
-  const { primaryWallet, handleLogOut } = useDynamicContext();
+  const { primaryWallet, handleLogOut } = useDynamicContextSafe();
 
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
@@ -43,7 +52,7 @@ export default function Web3Provider({ children }) {
   const oasis = customEvmNetworks.find((chain) => chain.group === "oasis");
 
   async function init() {
-    if (isInitiating.current) return;
+    if (isInitiating.current || !primaryWallet) return;
     isInitiating.current = true;
     try {
       const _provider = await getWeb3Provider(primaryWallet);

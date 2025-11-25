@@ -16,6 +16,8 @@
     "@dynamic-labs/ethers-v6": "^3.1.1",
     "@dynamic-labs/sdk-react-core": "^3.1.0",
     "@nextui-org/react": "^2.4.8",
+    "@noble/hashes": "^2.0.1",
+    "@noble/secp256k1": "^3.0.0",
     "@oasisprotocol/sapphire-ethers-v6": "^6.0.1",
     "@openzeppelin/contracts": "^5.0.2",
     "@uidotdev/usehooks": "^2.4.1",

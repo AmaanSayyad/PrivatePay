@@ -11,6 +11,9 @@ import TransactionsPage from "./pages/TransactionsPage.jsx";
 import MainBalancePage from "./pages/MainBalancePage.jsx";
 import PrivateBalancePage from "./pages/PrivateBalancePage.jsx";
 import AptosPage from "./pages/AptosPage.jsx";
+import MinimalProvider from "./providers/MinimalProvider.jsx";
+import RootProvider from "./providers/RootProvider.jsx";
+import { RootLayout } from "./layouts/RootLayout.jsx";
 
 const EXCLUDED_SUBDOMAINS = [
   "www",
@@ -33,7 +36,13 @@ const EXCLUDED_SUBDOMAINS = [
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <AuthLayout />,
+    element: (
+      <RootProvider>
+        <RootLayout>
+          <AuthLayout />
+        </RootLayout>
+      </RootProvider>
+    ),
     loader: () => {
       const host = window.location.hostname;
       const suffix = `.${import.meta.env.VITE_WEBSITE_HOST}`;
@@ -89,10 +98,6 @@ export const router = createBrowserRouter([
         path: "/private-details",
         element: <PrivateBalancePage />,
       },
-      {
-        path: "/aptos",
-        element: <AptosPage />,
-      },
     ],
   },
   {
@@ -105,5 +110,14 @@ export const router = createBrowserRouter([
         element: <PaymentPage />,
       },
     ],
+  },
+  {
+    path: "/aptos",
+    element: (
+      <MinimalProvider>
+        <AptosPage />
+      </MinimalProvider>
+    ),
+    errorElement: <ErrorPage />,
   },
 ]);
