@@ -37,6 +37,15 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: (
+      <MinimalProvider>
+        <AptosPage />
+      </MinimalProvider>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: "/dashboard",
+    element: (
       <RootProvider>
         <RootLayout>
           <AuthLayout />
@@ -56,14 +65,27 @@ export const router = createBrowserRouter([
 
       return { subdomain: null };
     },
+    loader: () => {
+      const host = window.location.hostname;
+      const suffix = `.${import.meta.env.VITE_WEBSITE_HOST}`;
+
+      if (host.endsWith(suffix)) {
+        const subdomain = host.slice(0, -suffix.length);
+        if (!EXCLUDED_SUBDOMAINS.includes(subdomain))
+          return { subdomain: subdomain };
+        else return { subdomain: null };
+      }
+
+      return { subdomain: null };
+    },
     errorElement: <ErrorPage />,
     children: [
       {
-        path: "/",
+        index: true,
         element: <IndexPage />,
       },
       {
-        path: "/:alias/detail/:parent",
+        path: ":alias/detail/:parent",
         loader: ({ params, request }) => {
           const url = new URL(request.url);
           const id = url.searchParams.get("id");
@@ -79,23 +101,23 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        path: "/:alias/transfer",
+        path: ":alias/transfer",
         element: <TransferPage />,
       },
       {
-        path: "/payment-links",
+        path: "payment-links",
         element: <PaymentLinksPage />,
       },
       {
-        path: "/transactions",
+        path: "transactions",
         element: <TransactionsPage />,
       },
       {
-        path: "/main-details",
+        path: "main-details",
         element: <MainBalancePage />,
       },
       {
-        path: "/private-details",
+        path: "private-details",
         element: <PrivateBalancePage />,
       },
     ],
