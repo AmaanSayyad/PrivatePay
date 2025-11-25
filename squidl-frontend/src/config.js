@@ -88,6 +88,23 @@ export const TESTNET_CHAINS = [
     rpcUrls: ["https://sepolia.drpc.org"],
     vanityName: "Ethereum Sepolia",
   },
+  // Aptos Testnet (Note: Aptos uses different wallet system, not EVM)
+  {
+    blockExplorerUrls: ["https://explorer.aptoslabs.com/?network=testnet"],
+    chainId: 2,
+    chainName: "Aptos Testnet",
+    iconUrls: ["https://aptos.dev/static/images/aptos-logo-round.svg"],
+    name: "Aptos Testnet",
+    nativeCurrency: {
+      name: "Aptos",
+      symbol: "APT",
+      decimals: 8,
+    },
+    networkId: 2,
+    rpcUrls: ["https://fullnode.testnet.aptoslabs.com"],
+    vanityName: "Aptos Testnet",
+    isAptos: true,
+  },
   // polygon amoy
   {
     blockExplorerUrls: ["https://amoy.polygonscan.com"], // Explorer for the Testnet
@@ -198,5 +215,30 @@ export const CHAINS = [
     isTestnet: true,
     network: "testnet",
     compatibility: [137],
+  },
+  // Aptos Chains
+  {
+    id: 2, // Aptos Testnet
+    name: "Aptos Testnet",
+    chainlistUrl: "https://chainlist.org",
+    rpcUrl: "https://fullnode.testnet.aptoslabs.com",
+    nativeToken: "APT",
+    blockExplorerUrl: "https://explorer.aptoslabs.com/?network=testnet",
+    imageUrl: "https://aptos.dev/static/images/aptos-logo-round.svg",
+    isTestnet: true,
+    network: "testnet",
+    isAptos: true, // Flag to identify Aptos chains
+  },
+  {
+    id: 1, // Aptos Mainnet
+    name: "Aptos Mainnet",
+    chainlistUrl: "https://chainlist.org",
+    rpcUrl: "https://fullnode.mainnet.aptoslabs.com",
+    nativeToken: "APT",
+    blockExplorerUrl: "https://explorer.aptoslabs.com/?network=mainnet",
+    imageUrl: "https://aptos.dev/static/images/aptos-logo-round.svg",
+    isTestnet: false,
+    network: "mainnet",
+    isAptos: true,
   },
 ];

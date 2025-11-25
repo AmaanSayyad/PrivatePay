@@ -12,6 +12,11 @@ import {
   stealthSignerGenerateStealthAddress,
   stealthSignerGetMetaAddress,
 } from "../../lib/contracts/oasis/oasisContract.js";
+import {
+  registerAptosMetaAddress,
+  getAptosMetaAddressCount,
+  getAptosMetaAddress,
+} from "./helpers/aptosHelpers.js";
 import { getAliasTotalBalanceUSD } from "../user/helpers.js";
 
 /**
@@ -545,7 +550,126 @@ export const stealthAddressRoutes = (app, _, done) => {
         message: "error while fetching recent stealth addresses",
       });
     }
-  })
+  });
+
+  // ==================== APTOS ENDPOINTS ====================
+
+  // POST /aptos/register-meta-address - Register Aptos meta address
+  app.post(
+    "/aptos/register-meta-address",
+    {
+      preHandler: [authMiddleware],
+    },
+    async (req, res) => {
+      try {
+        const { address } = req.user;
+        const { accountAddress, spendPubKey, viewingPubKey, isTestnet = true } = req.body;
+
+        if (!accountAddress || !spendPubKey || !viewingPubKey) {
+          return res.status(400).send({
+            message: "Missing required parameters: accountAddress, spendPubKey, viewingPubKey",
+          });
+        }
+
+        const user = await prismaClient.user.findFirst({
+          where: {
+            wallet: {
+              address,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (!user) {
+          return res.status(400).send({ message: "User not found" });
+        }
+
+        const result = await registerAptosMetaAddress({
+          userId: user.id,
+          accountAddress,
+          spendPubKey,
+          viewingPubKey,
+          isTestnet,
+        });
+
+        return res.send(result);
+      } catch (error) {
+        console.error("Error registering Aptos meta address:", error);
+        return res.status(500).send({
+          message: "Error registering Aptos meta address",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  // GET /aptos/meta-address-count - Get Aptos meta address count
+  app.get(
+    "/aptos/meta-address-count",
+    {
+      preHandler: [authMiddleware],
+    },
+    async (req, res) => {
+      try {
+        const { accountAddress, isTestnet = true } = req.query;
+
+        if (!accountAddress) {
+          return res.status(400).send({
+            message: "Missing required parameter: accountAddress",
+          });
+        }
+
+        const count = await getAptosMetaAddressCount({
+          accountAddress,
+          isTestnet: isTestnet === "true" || isTestnet === true,
+        });
+
+        return res.send({ count });
+      } catch (error) {
+        console.error("Error getting Aptos meta address count:", error);
+        return res.status(500).send({
+          message: "Error getting Aptos meta address count",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  // GET /aptos/meta-address/:index - Get Aptos meta address at index
+  app.get(
+    "/aptos/meta-address/:index",
+    {
+      preHandler: [authMiddleware],
+    },
+    async (req, res) => {
+      try {
+        const { accountAddress, isTestnet = true } = req.query;
+        const { index } = req.params;
+
+        if (!accountAddress) {
+          return res.status(400).send({
+            message: "Missing required parameter: accountAddress",
+          });
+        }
+
+        const metaAddress = await getAptosMetaAddress({
+          accountAddress,
+          index: parseInt(index),
+          isTestnet: isTestnet === "true" || isTestnet === true,
+        });
+
+        return res.send(metaAddress);
+      } catch (error) {
+        console.error("Error getting Aptos meta address:", error);
+        return res.status(500).send({
+          message: "Error getting Aptos meta address",
+          error: error.message,
+        });
+      }
+    }
+  );
 
   done();
 };

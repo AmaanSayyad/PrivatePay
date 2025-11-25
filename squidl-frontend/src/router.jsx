@@ -10,6 +10,7 @@ import PaymentLinksPage from "./pages/PaymentLinksPage.jsx";
 import TransactionsPage from "./pages/TransactionsPage.jsx";
 import MainBalancePage from "./pages/MainBalancePage.jsx";
 import PrivateBalancePage from "./pages/PrivateBalancePage.jsx";
+import AptosPage from "./pages/AptosPage.jsx";
 
 const EXCLUDED_SUBDOMAINS = [
   "www",
@@ -87,6 +88,10 @@ export const router = createBrowserRouter([
       {
         path: "/private-details",
         element: <PrivateBalancePage />,
+      },
+      {
+        path: "/aptos",
+        element: <AptosPage />,
       },
     ],
   },
