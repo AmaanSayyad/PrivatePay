@@ -1,0 +1,9 @@
+node_modules
+.DS_Store
+/*-dump.txt
+/*.so
+/target/
+/test-ledger/
+.env
+/squidl-rofl/target
+oasis_cli_0.10.1_linux_amd64.tar.gz.1
