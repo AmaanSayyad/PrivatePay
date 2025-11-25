@@ -65,19 +65,6 @@ export const router = createBrowserRouter([
 
       return { subdomain: null };
     },
-    loader: () => {
-      const host = window.location.hostname;
-      const suffix = `.${import.meta.env.VITE_WEBSITE_HOST}`;
-
-      if (host.endsWith(suffix)) {
-        const subdomain = host.slice(0, -suffix.length);
-        if (!EXCLUDED_SUBDOMAINS.includes(subdomain))
-          return { subdomain: subdomain };
-        else return { subdomain: null };
-      }
-
-      return { subdomain: null };
-    },
     errorElement: <ErrorPage />,
     children: [
       {
