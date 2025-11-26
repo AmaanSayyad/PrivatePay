@@ -137,6 +137,31 @@ export const generateEphemeralKeyPair = () => {
 };
 
 /**
+ * Generate meta address key pairs (spend and viewing)
+ * Returns both private and public keys for secure storage
+ */
+export const generateMetaAddressKeys = () => {
+  // Generate spend key pair
+  const spendPrivateKey = generatePrivateKey();
+  const spendPublicKey = getPublicKey(spendPrivateKey);
+  
+  // Generate viewing key pair
+  const viewingPrivateKey = generatePrivateKey();
+  const viewingPublicKey = getPublicKey(viewingPrivateKey);
+  
+  return {
+    spend: {
+      privateKey: bytesToHex(spendPrivateKey),
+      publicKey: bytesToHex(spendPublicKey),
+    },
+    viewing: {
+      privateKey: bytesToHex(viewingPrivateKey),
+      publicKey: bytesToHex(viewingPublicKey),
+    },
+  };
+};
+
+/**
  * Validate public key format (33 bytes compressed)
  */
 export const validatePublicKey = (pubKeyHex) => {
