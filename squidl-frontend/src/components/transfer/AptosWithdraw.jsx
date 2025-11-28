@@ -84,30 +84,61 @@ export function AptosWithdraw() {
     try {
       toast.loading("Processing withdrawal...", { id: "withdraw" });
 
-      // Treasury'den kullanıcıya transfer yapılacak
-      // Backend API'ye istek gönder (treasury private key backend'de olmalı)
-      const response = await fetch('/api/aptos-withdraw', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          amount: parseFloat(amount),
-          destinationAddress,
-        }),
-      });
+      // Import Aptos SDK
+      const { Aptos, AptosConfig, Network, Account, Ed25519PrivateKey } = await import("@aptos-labs/ts-sdk");
+      const { withdrawFunds } = await import("../../lib/supabase");
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Withdrawal failed');
+      // Treasury private key (should be in env)
+      const treasuryPrivateKeyHex = import.meta.env.VITE_TREASURY_PRIVATE_KEY;
+      
+      if (!treasuryPrivateKeyHex) {
+        throw new Error("Treasury private key not configured");
       }
 
-      const { txHash, newBalance } = await response.json();
+      // Initialize Aptos client
+      const config = new AptosConfig({ network: Network.TESTNET });
+      const aptos = new Aptos(config);
+
+      // Create treasury account from private key
+      const privateKey = new Ed25519PrivateKey(treasuryPrivateKeyHex);
+      const treasuryAccount = Account.fromPrivateKey({ privateKey });
+
+      console.log("Treasury address:", treasuryAccount.accountAddress.toString());
+
+      // Convert amount to octas (1 APT = 100000000 octas)
+      const amountInOctas = Math.floor(parseFloat(amount) * 100_000_000);
+
+      // Build transaction
+      const transaction = await aptos.transaction.build.simple({
+        sender: treasuryAccount.accountAddress,
+        data: {
+          function: "0x1::coin::transfer",
+          typeArguments: ["0x1::aptos_coin::AptosCoin"],
+          functionArguments: [destinationAddress, amountInOctas],
+        },
+      });
+
+      // Sign and submit transaction
+      const committedTxn = await aptos.signAndSubmitTransaction({
+        signer: treasuryAccount,
+        transaction,
+      });
+
+      console.log("Transaction submitted:", committedTxn.hash);
+
+      // Wait for transaction
+      const executedTxn = await aptos.waitForTransaction({
+        transactionHash: committedTxn.hash,
+      });
+
+      if (!executedTxn.success) {
+        throw new Error("Transaction failed on blockchain");
+      }
+
+      // Update Supabase balance
+      const result = await withdrawFunds(username, parseFloat(amount), destinationAddress, committedTxn.hash);
 
       toast.dismiss("withdraw");
-      
-      const shortHash = txHash.slice(0, 6) + "..." + txHash.slice(-4);
       
       toast.success(
         `Withdrawal successful! ${parseFloat(amount).toFixed(4)} APT sent to ${destinationAddress.slice(0, 6)}...${destinationAddress.slice(-4)}`,
@@ -115,7 +146,7 @@ export function AptosWithdraw() {
       );
 
       // Update local balance
-      setBalance(newBalance);
+      setBalance(result.newBalance);
 
       // Trigger balance update
       window.dispatchEvent(new Event('balance-updated'));

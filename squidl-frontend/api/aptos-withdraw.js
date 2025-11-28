@@ -1,23 +1,6 @@
 import { Aptos, AptosConfig, Network, Account, Ed25519PrivateKey } from "@aptos-labs/ts-sdk";
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
-const treasuryPrivateKey = process.env.TREASURY_PRIVATE_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  db: { schema: 'public' },
-  auth: { persistSession: false }
-});
-
-// Initialize Aptos client
-const getAptosClient = (isTestnet = true) => {
-  const config = new AptosConfig({
-    network: isTestnet ? Network.TESTNET : Network.MAINNET,
-  });
-  return new Aptos(config);
-};
-
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -36,6 +19,32 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
+
+  // Get environment variables
+  const supabaseUrl = process.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+  const treasuryPrivateKey = process.env.TREASURY_PRIVATE_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return res.status(500).json({ message: 'Supabase configuration missing' });
+  }
+
+  if (!treasuryPrivateKey) {
+    return res.status(500).json({ message: 'Treasury configuration missing' });
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    db: { schema: 'public' },
+    auth: { persistSession: false }
+  });
+
+  // Initialize Aptos client
+  const getAptosClient = (isTestnet = true) => {
+    const config = new AptosConfig({
+      network: isTestnet ? Network.TESTNET : Network.MAINNET,
+    });
+    return new Aptos(config);
+  };
 
   try {
     const { username, amount, destinationAddress } = req.body;
