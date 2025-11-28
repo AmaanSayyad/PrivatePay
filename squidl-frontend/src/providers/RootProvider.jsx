@@ -17,17 +17,17 @@ export default function RootProvider({ children }) {
       }}
     >
       <NextUIProvider>
-        <DynamicProvider>
-          <Web3Provider>
-            <AptosProvider isTestnet={isTestnet}>
+        <AptosProvider isTestnet={isTestnet}>
+          <DynamicProvider>
+            <Web3Provider>
               <AuthProvider>
                 <UserProvider>
                   {children}
                 </UserProvider>
               </AuthProvider>
-            </AptosProvider>
-          </Web3Provider>
-        </DynamicProvider>
+            </Web3Provider>
+          </DynamicProvider>
+        </AptosProvider>
       </NextUIProvider>
     </SWRConfig>
   );

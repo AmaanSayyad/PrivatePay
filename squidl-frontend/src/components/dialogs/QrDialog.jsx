@@ -3,17 +3,20 @@ import { Icons } from "../shared/Icons.jsx";
 import toast from "react-hot-toast";
 import Chains from "../shared/Chains.jsx";
 import { QRCode } from "react-qrcode-logo";
-import useSWR from "swr";
-import { squidlAPI } from "../../api/squidl.js";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
+import { useAptos } from "../../providers/AptosProvider.jsx";
 
 export default function QrDialog({ open, setOpen, qrUrl }) {
-  const { data: user, isLoading } = useSWR("/auth/me", async (url) => {
-    const { data } = await squidlAPI.get(url);
-    return data;
-  });
-
+  const { account } = useAptos();
+  const [username, setUsername] = useState("");
   const qrRef = useRef(null);
+
+  useEffect(() => {
+    if (account) {
+      const savedUsername = localStorage.getItem(`aptos_username_${account}`);
+      setUsername(savedUsername || account.slice(2, 8));
+    }
+  }, [account]);
 
   const onCopy = (text) => {
     toast.success("Copied to clipboard", {
@@ -26,38 +29,30 @@ export default function QrDialog({ open, setOpen, qrUrl }) {
 
   const handleShare = async () => {
     try {
-      const response = await fetch(qrUrl);
-      const blob = await response.blob();
-      const file = new File([blob], "image.png", { type: blob.type });
-
-      if (
-        navigator.share &&
-        navigator.canShare &&
-        navigator.canShare({ files: [file] })
-      ) {
+      if (navigator.share) {
         await navigator.share({
-          title: "Share Image",
-          text: "Check out this image!",
-          files: [file],
+          title: "Payment Link",
+          text: `${username}.privatepay.me`,
         });
-        console.log("Image shared successfully!");
       } else {
-        alert("Web Share API is not supported in your browser.");
+        onCopy(`${username}.privatepay.me`);
       }
     } catch (error) {
-      console.error("Error sharing the image:", error);
+      console.error("Error sharing:", error);
     }
   };
 
   const handleDownload = async () => {
     try {
-      await qrRef.current.download();
+      await qrRef.current.download("png", {
+        name: `${username}-privatepay-qr`,
+      });
     } catch (error) {
       console.error("Error downloading the image:", error);
     }
   };
 
-  if (isLoading) return null;
+  if (!account) return null;
 
   return (
     <Modal
@@ -75,11 +70,14 @@ export default function QrDialog({ open, setOpen, qrUrl }) {
           <Icons.close className="text-black size-6" />
         </button>
 
-        <img
-          src="/assets/squidl-logo.svg"
-          alt="logo"
-          className="object-contain w-auto h-10"
-        />
+        <div className="flex flex-col items-center gap-2">
+          <img
+            src="/assets/squidl-logo.svg"
+            alt="logo"
+            className="object-contain w-auto h-10"
+          />
+          <p className="text-2xl font-bold text-primary">PRIVATEPAY</p>
+        </div>
 
         <h1 className="font-medium text-xl text-[#19191B]">Your QR Code</h1>
 
@@ -88,7 +86,7 @@ export default function QrDialog({ open, setOpen, qrUrl }) {
             <div className="w-full h-full bg-white p-5 rounded-[24px]">
               <QRCode
                 ref={qrRef}
-                value={`${user?.username}.squidl.me`}
+                value={`${username}.privatepay.me`}
                 qrStyle="dots"
                 logoImage="/assets/nouns.png"
                 logoWidth={30}
@@ -102,9 +100,9 @@ export default function QrDialog({ open, setOpen, qrUrl }) {
 
             <div className="flex flex-row items-center gap-2.5 mt-3">
               <h1 className="font-medium text-lg text-[#F4F4F4]">
-                {user?.username}.squidl.me
+                {username}.privatepay.me
               </h1>
-              <button onClick={() => onCopy(`${user?.username}.squidl.me`)}>
+              <button onClick={() => onCopy(`${username}.privatepay.me`)}>
                 <Icons.copy className="text-primary-200" />
               </button>
             </div>

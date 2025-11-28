@@ -6,7 +6,6 @@ import {
   Input,
   Modal,
   ModalContent,
-  Skeleton,
 } from "@nextui-org/react";
 import { useEffect, useState } from "react";
 import { Icons } from "../shared/Icons.jsx";
@@ -14,14 +13,11 @@ import Nounsies from "../shared/Nounsies.jsx";
 import { validateAlphanumeric } from "../../utils/string.js";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import useSWR from "swr";
-import { squidlAPI } from "../../api/squidl.js";
-import { useUserWallets } from "@dynamic-labs/sdk-react-core";
-import { useEmitEvent } from "../../hooks/use-event.js";
-import { useUser } from "../../providers/UserProvider.jsx";
+import { useAptos } from "../../providers/AptosProvider.jsx";
 import { CARDS_SCHEME } from "../home/dashboard/PaymentLinksDashboard.jsx";
 import SquidLogo from "../../assets/squidl-logo.svg?react";
 import { cnm } from "../../utils/style.js";
+import { createPaymentLink, getPaymentLinks } from "../../lib/supabase.js";
 
 const confettiConfig = {
   angle: 90, // Angle at which the confetti will explode
@@ -37,29 +33,30 @@ const confettiConfig = {
 };
 
 export default function CreateLinkDialog() {
-  const { assets } = useUser();
-
+  const { account } = useAptos();
   const [isOpen, setOpen] = useAtom(isCreateLinkDialogAtom);
   const [step, setStep] = useState("one");
   const [alias, setAlias] = useState("");
-
-  const { data: user, isLoading } = useSWR("/auth/me", async (url) => {
-    const { data } = await squidlAPI.get(url);
-    return data;
-  });
-
+  const [username, setUsername] = useState("");
   const [initialAliasCount, setInitialAliasCount] = useState(0);
+
+  useEffect(() => {
+    async function loadData() {
+      if (account) {
+        const savedUsername = localStorage.getItem(`aptos_username_${account}`);
+        setUsername(savedUsername || account.slice(2, 8));
+        
+        const paymentLinks = await getPaymentLinks(account);
+        setInitialAliasCount(paymentLinks.length);
+      }
+    }
+    loadData();
+  }, [account]);
 
   function reset() {
     setInitialAliasCount(0);
     setAlias("");
   }
-
-  useEffect(() => {
-    if (assets?.aliasesList && initialAliasCount === 0) {
-      setInitialAliasCount(assets.aliasesList.length);
-    }
-  }, [assets, initialAliasCount]);
 
   const nextColorScheme =
     CARDS_SCHEME[initialAliasCount % CARDS_SCHEME.length] + 1;
@@ -86,16 +83,14 @@ export default function CreateLinkDialog() {
         {step === "one" ? (
           <StepOne
             setStep={setStep}
-            isLoading={isLoading}
-            user={user}
+            username={username}
             alias={alias}
             setAlias={setAlias}
             setInitialAliasCount={setInitialAliasCount}
           />
         ) : (
           <StepTwo
-            isLoading={isLoading}
-            user={user}
+            username={username}
             setOpen={setOpen}
             setStep={setStep}
             alias={alias}
@@ -110,13 +105,12 @@ export default function CreateLinkDialog() {
 
 function StepOne({
   setStep,
-  isLoading,
-  user,
+  username,
   alias,
   setAlias,
   setInitialAliasCount,
 }) {
-  const emitEvent = useEmitEvent("create-link-dialog");
+  const { account } = useAptos();
 
   async function handleUpdate() {
     if (!alias) {
@@ -130,24 +124,30 @@ function StepOne({
     if (alias.length > 15) {
       return toast.error("Alias can't be more than 15 characters");
     }
-    const id = toast.loading("Creating alias address");
 
     try {
-      const res = await squidlAPI.post("/stealth-address/aliases/new-alias", {
-        alias,
-      });
-      console.log({ res });
-      setInitialAliasCount(0);
-      toast.success("Your alias has been created!");
-      emitEvent({
-        message: "alias-created",
-      });
+      // Get username from localStorage
+      const currentUsername = localStorage.getItem(`aptos_username_${account}`) || account?.slice(2, 8);
+
+      // Save payment link to Supabase
+      await createPaymentLink(account, currentUsername, alias);
+
+      // Get updated count
+      const paymentLinks = await getPaymentLinks(account);
+      setInitialAliasCount(paymentLinks.length);
+
+      toast.success("Your payment link has been created!");
+      
+      // Trigger a custom event to refresh the dashboard
+      window.dispatchEvent(new Event('payment-links-updated'));
+      
       setStep("two");
-    } catch (e) {
-      console.log(e);
-      toast.error("Error creating your alias");
-    } finally {
-      toast.dismiss(id);
+    } catch (error) {
+      if (error.message?.includes('duplicate')) {
+        toast.error("This alias already exists");
+      } else {
+        toast.error("Failed to create payment link");
+      }
     }
   }
 
@@ -177,20 +177,15 @@ function StepOne({
           }}
           value={alias}
           onChange={(e) => {
-            const val = e.target.value;
+            const val = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '');
             setAlias(val);
           }}
-          place
           placeholder="your-alias"
           variant="bordered"
         />
-        {isLoading ? (
-          <Skeleton className="w-25 h-6" />
-        ) : (
-          <p className="absolute right-4 text-neutral-400">
-            .{user?.username}.squidl.me
-          </p>
-        )}
+        <p className="absolute right-4 text-neutral-400">
+          .privatepay.me
+        </p>
       </div>
       <Button
         onClick={handleUpdate}
@@ -203,8 +198,7 @@ function StepOne({
 }
 
 function StepTwo({
-  user,
-  isLoading,
+  username,
   setOpen,
   setStep,
   alias,
@@ -213,7 +207,7 @@ function StepTwo({
 }) {
   const [confettiTrigger, setConfettiTrigger] = useState(false);
   const navigate = useNavigate();
-  const userWallets = useUserWallets();
+  const { account } = useAptos();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -248,27 +242,23 @@ function StepTwo({
         />
 
         <div className="absolute right-5 top-5 size-12 rounded-full overflow-hidden">
-          <Nounsies address={userWallets[0]?.address} />
+          <Nounsies address={account || ""} />
         </div>
 
         <div className="relative w-full h-52 md:h-60 flex flex-col items-center justify-start py-7 px-6">
           <div className="w-full flex items-center justify-between">
             <div className="flex gap-2 items-center">
               <h1 className="text-white font-medium">
-                {isLoading ? (
-                  <Skeleton className="w-25 h-6" />
-                ) : (
-                  <p
-                    className={`${
-                      nextColorScheme === 2 ? "text-black " : "text-white"
-                    }`}
-                  >
-                    {alias}.{user?.username}.squidl.me
-                  </p>
-                )}
+                <p
+                  className={`${
+                    nextColorScheme === 2 ? "text-black " : "text-white"
+                  }`}
+                >
+                  {alias}.privatepay.me
+                </p>
               </h1>
               <button
-                onClick={() => onCopy(`${alias}.${user?.username}.squidl.me`)}
+                onClick={() => onCopy(`${alias}.privatepay.me`)}
               >
                 <Icons.copy
                   className={`size-4 ${
@@ -310,10 +300,15 @@ function StepTwo({
 
       <Button
         onClick={async () => {
-          await navigator.share({
-            title: "Link",
-            text: `${alias}.${user?.username}.squidl.me`,
-          });
+          try {
+            await navigator.share({
+              title: "Payment Link",
+              text: `${alias}.privatepay.me`,
+            });
+          } catch (error) {
+            // Fallback to copy if share is not supported
+            onCopy(`${alias}.privatepay.me`);
+          }
         }}
         className="h-16 rounded-full text-white flex items-center justify-center w-full mt-4 bg-primary-600"
       >

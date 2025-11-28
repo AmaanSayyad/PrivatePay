@@ -1,7 +1,6 @@
 import { Navigate, Outlet, useLoaderData } from "react-router-dom";
 import { DynamicEmbeddedWidget } from "@dynamic-labs/sdk-react-core";
 import AuthProvider from "../providers/AuthProvider";
-import RootProvider from "../providers/RootProvider";
 import { Toaster } from "react-hot-toast";
 import Header from "../components/shared/Header";
 import Navbar from "../components/shared/Navbar";
@@ -15,7 +14,10 @@ import EngowlWatermark from "../components/shared/EngowlWatermark.jsx";
 
 export default function AuthLayout() {
   const { isSignedIn } = useSession();
-  const { subdomain } = useLoaderData();
+  const loaderData = useLoaderData();
+  const subdomain = loaderData?.subdomain;
+  const dynamicEnvId = import.meta.env.VITE_DYNAMIC_ENV_ID;
+  const hasDynamic = dynamicEnvId && dynamicEnvId !== "your_dynamic_environment_id" && dynamicEnvId !== "";
 
   if (subdomain) {
     return (
@@ -24,6 +26,21 @@ export default function AuthLayout() {
           <Payment />
         </div>
       </PaymentLayout>
+    );
+  }
+
+  // If Dynamic is not configured, skip authentication and go directly to dashboard
+  if (!hasDynamic) {
+    return (
+      <AuthProvider>
+        {/* <EngowlWatermark /> */}
+        <CreateLinkDialog />
+        <GetStartedDialog />
+        <Toaster />
+        <Header />
+        <Outlet />
+        <Navbar />
+      </AuthProvider>
     );
   }
 

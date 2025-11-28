@@ -5,6 +5,15 @@
 
 import { Aptos, AptosConfig, Network, Account, Ed25519PrivateKey } from "@aptos-labs/ts-sdk";
 
+// Re-export stealth address functions for convenience
+export {
+  generateStealthAddress,
+  generateEphemeralKeyPair,
+  generateMetaAddressKeys,
+  validatePublicKey,
+  hexToBytes as hexToBytesFromStealth,
+} from "./aptos/stealthAddress.js";
+
 // Aptos Module Address
 export const APTOS_MODULE_ADDRESS = import.meta.env.VITE_APTOS_MODULE_ADDRESS || 
   "0x86c46b435a128d6344d42e832ef22066133d39a8a1f8e42b02107b8b246e280c";
@@ -177,7 +186,7 @@ export const sendAptosStealthPayment = async ({
 /**
  * Helper: Convert hex string to Uint8Array
  */
-const hexToBytes = (hex) => {
+export const hexToBytes = (hex) => {
   const cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
   const bytes = new Uint8Array(cleanHex.length / 2);
   for (let i = 0; i < cleanHex.length; i += 2) {
@@ -235,6 +244,51 @@ export const getAptosMetaAddressFromChain = async ({
     };
   } catch (error) {
     console.error("Error getting meta address from chain:", error);
+    throw error;
+  }
+};
+
+/**
+ * Send normal APT transfer (to treasury or any address)
+ */
+export const sendAptTransfer = async ({
+  accountAddress,
+  recipientAddress,
+  amount,
+  isTestnet = true,
+}) => {
+  try {
+    if (typeof window === "undefined" || !window.aptos) {
+      throw new Error("Aptos wallet not found");
+    }
+
+    // Convert amount to octas (1 APT = 100000000 octas)
+    const amountInOctas = Math.floor(amount * 100000000);
+
+    const transaction = {
+      type: "entry_function_payload",
+      function: "0x1::coin::transfer",
+      type_arguments: ["0x1::aptos_coin::AptosCoin"],
+      arguments: [recipientAddress, amountInOctas.toString()],
+    };
+
+    console.log("Transfer transaction:", JSON.stringify(transaction, null, 2));
+    
+    const response = await window.aptos.signAndSubmitTransaction(transaction);
+    
+    // Wait for transaction
+    const aptos = getAptosClient(isTestnet);
+    const executedTxn = await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    });
+
+    return {
+      hash: response.hash,
+      success: executedTxn.success,
+      explorerUrl: `https://explorer.aptoslabs.com/txn/${response.hash}?network=${isTestnet ? "testnet" : "mainnet"}`,
+    };
+  } catch (error) {
+    console.error("Error sending APT transfer:", error);
     throw error;
   }
 };

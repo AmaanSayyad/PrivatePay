@@ -1,60 +1,59 @@
 import { useEffect, useState } from "react";
-import { squidlAPI } from "../../../api/squidl";
 import { cnm } from "../../../utils/style";
 import { Button, Skeleton, Spinner } from "@nextui-org/react";
 import QrCodeIcon from "../../../assets/icons/qr-code.svg?react";
 import CopyIcon from "../../../assets/icons/copy.svg?react";
-import { AnimatePresence, motion } from "framer-motion";
-import BalanceChart from "./BalanceChart";
-import { useAtomValue } from "jotai";
-import { isBackAtom } from "../../../store/payment-card-store";
-import { Fingerprint, Handshake, Lock } from "lucide-react";
+import { motion } from "framer-motion";
 import QrDialog from "../../dialogs/QrDialog.jsx";
 import PaymentLinksDashboard from "./PaymentLinksDashboard.jsx";
-import useSWR from "swr";
-import { shortenAddress } from "../../../utils/string.js";
 import toast from "react-hot-toast";
 import { Icons } from "../../shared/Icons.jsx";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "../../../providers/UserProvider.jsx";
-import { formatCurrency } from "@coingecko/cryptoformat";
+import { useAptos } from "../../../providers/AptosProvider.jsx";
+import { getUserBalance, registerUser } from "../../../lib/supabase.js";
 
 export default function Dashboard() {
   const [openQr, setOpenQr] = useState(false);
-
-  const isBackValue = useAtomValue(isBackAtom);
-
-  const { data: user, isLoading } = useSWR("/auth/me", async (url) => {
-    const { data } = await squidlAPI.get(url);
-    return data;
-  });
+  const { account } = useAptos();
+  const [balance, setBalance] = useState(0);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(true);
 
   useEffect(() => {
-    if (isBackValue.isBack) {
-      const paymentLinks = document.querySelector("#payment-links");
-      paymentLinks.scrollIntoView({
-        behavior: "instant",
-      });
-    }
-  }, [isBackValue.isBack]);
+    async function loadBalance() {
+      if (account) {
+        const username = localStorage.getItem(`aptos_username_${account}`) || account.slice(2, 8);
+        
+        // Register user if not exists
+        try {
+          await registerUser(account, username);
+        } catch (error) {
+          console.error('Error registering user:', error);
+        }
 
-  if (isLoading) {
-    return (
-      <div className="w-full h-screen flex items-center justify-center">
-        <Spinner size="lg" color="purply" />
-      </div>
-    );
-  }
+        // Get balance
+        const balanceData = await getUserBalance(username);
+        setBalance(balanceData?.available_balance || 0);
+        setIsLoadingBalance(false);
+      }
+    }
+
+    loadBalance();
+
+    // Listen for balance updates
+    const handleBalanceUpdate = () => {
+      loadBalance();
+    };
+
+    window.addEventListener('balance-updated', handleBalanceUpdate);
+
+    return () => {
+      window.removeEventListener('balance-updated', handleBalanceUpdate);
+    };
+  }, [account]);
 
   return (
     <>
-      <QrDialog
-        open={openQr}
-        setOpen={setOpenQr}
-        qrUrl={
-          "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/QR_Code_Example.svg/1200px-QR_Code_Example.svg.png"
-        }
-      />
+      <QrDialog open={openQr} setOpen={setOpenQr} />
 
       <motion.div
         layoutScroll
@@ -62,16 +61,9 @@ export default function Dashboard() {
       >
         <div className="flex flex-col items-center py-20 w-full">
           <div className="w-full max-w-md flex flex-col items-center gap-4 pt-12 pb-20">
-            {/* TODO: Remove this later */}
-            {/* <Experimental /> */}
-
-            <ReceiveCard
-              setOpenQr={setOpenQr}
-              user={user}
-              isLoading={isLoading}
-            />
-            <TotalBalance />
-            <PaymentLinksDashboard user={user} />
+            <ReceiveCard setOpenQr={setOpenQr} />
+            <BalanceCard balance={balance} isLoading={isLoadingBalance} />
+            <PaymentLinksDashboard />
           </div>
         </div>
       </motion.div>
@@ -80,35 +72,42 @@ export default function Dashboard() {
 }
 
 function ReceiveCard({ setOpenQr, user, isLoading }) {
-  const [loadingAlias, setLoading] = useState(false);
+  const { account, isConnected } = useAptos();
+  const [mode, setMode] = useState("username");
+  const [username, setUsername] = useState("");
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
 
-  const [mode, setMode] = useState("ens");
-
-  const { data: aliasDetailData, mutate: mutateAliasData } = useSWR(
-    `/stealth-address/aliases/${user?.username}/detail`,
-    async (url) => {
-      try {
-        setLoading(true);
-        const { data } = await squidlAPI.get(url);
-        console.log("aliasData", data);
-        return data;
-      } catch (error) {
-        console.error("Error fetching alias data", error);
-        return null;
-      } finally {
-        setLoading(false);
+  // Load username from localStorage
+  useEffect(() => {
+    if (account) {
+      const savedUsername = localStorage.getItem(`aptos_username_${account}`);
+      if (savedUsername) {
+        setUsername(savedUsername);
+      } else {
+        // Generate default username from address
+        const defaultUsername = account.slice(2, 8);
+        setUsername(defaultUsername);
       }
     }
-  );
+  }, [account]);
 
-  console.log({ user });
+  const handleSaveUsername = () => {
+    if (username && account) {
+      localStorage.setItem(`aptos_username_${account}`, username);
+      setIsEditingUsername(false);
+      toast.success("Username saved!", {
+        duration: 1000,
+        position: "bottom-center",
+      });
+    }
+  };
 
   const onCopy = () => {
     let copyText;
-    if (mode === "ens" && user?.username) {
-      copyText = `${user?.username}.squidl.me`;
-    } else if (aliasDetailData?.stealthAddress?.address) {
-      copyText = aliasDetailData.stealthAddress.address;
+    if (mode === "username" && username) {
+      copyText = `${username}.privatepay.me`;
+    } else if (account) {
+      copyText = account;
     } else {
       toast.error("Address not available", {
         duration: 1000,
@@ -124,6 +123,19 @@ function ReceiveCard({ setOpenQr, user, isLoading }) {
     });
   };
 
+  if (!isConnected) {
+    return (
+      <div className="bg-primary-600 p-4 rounded-3xl text-white w-full">
+        <div className="w-full flex items-center justify-between">
+          <p className="text-xl">Receive</p>
+        </div>
+        <div className="bg-white rounded-full w-full h-14 mt-4 flex items-center justify-center text-gray-500">
+          Connect wallet to receive payments
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-primary-600 p-4 rounded-3xl text-white w-full">
       <div className="w-full flex items-center justify-between">
@@ -131,27 +143,23 @@ function ReceiveCard({ setOpenQr, user, isLoading }) {
         <div className="bg-white rounded-full flex relative items-center font-medium px-1 py-1">
           <div
             className={cnm(
-              "w-24 h-10 bg-primary-500 absolute left-1 rounded-full transition-transform ease-in-out",
-              mode === "ens" ? "translate-x-0" : "translate-x-full"
+              "w-28 h-10 bg-primary-500 absolute left-1 rounded-full transition-transform ease-in-out",
+              mode === "username" ? "translate-x-0" : "translate-x-full"
             )}
           ></div>
           <button
-            onClick={() => {
-              setMode("ens");
-            }}
+            onClick={() => setMode("username")}
             className={cnm(
-              "w-24 h-10 rounded-full flex items-center justify-center relative transition-colors",
-              mode === "ens" ? "text-white" : "text-primary"
+              "w-28 h-10 rounded-full flex items-center justify-center relative transition-colors text-xs",
+              mode === "username" ? "text-white" : "text-primary"
             )}
           >
-            ENS
+            Username
           </button>
           <button
-            onClick={() => {
-              setMode("address");
-            }}
+            onClick={() => setMode("address")}
             className={cnm(
-              "w-24 h-8 rounded-full flex items-center justify-center relative transition-colors",
+              "w-28 h-8 rounded-full flex items-center justify-center relative transition-colors text-xs",
               mode === "address" ? "text-white" : "text-primary"
             )}
           >
@@ -159,267 +167,112 @@ function ReceiveCard({ setOpenQr, user, isLoading }) {
           </button>
         </div>
       </div>
-      <div className="bg-white rounded-full w-full h-14 mt-4 flex items-center justify-between pl-6 pr-2 text-black">
-        {isLoading ? (
-          <Skeleton className="w-32 h-5 rounded-xl" />
-        ) : (
-          <>
-            {mode === "address" ? (
-              loadingAlias ? (
-                <Skeleton className="flex rounded-full w-20 h-8" />
-              ) : (
-                <p>
-                  {shortenAddress(aliasDetailData?.stealthAddress?.address)}
-                </p>
-              )
-            ) : (
-              <p>{user?.username}.squidl.me</p>
-            )}
-          </>
-        )}
-        <div className="flex items-center gap-2">
-          {mode === "address" ? (
+      
+      {isEditingUsername ? (
+        <div className="bg-white rounded-full w-full h-14 mt-4 flex items-center justify-between pl-4 pr-2 text-black">
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
+            placeholder="username"
+            className="flex-1 bg-transparent outline-none text-sm"
+            maxLength={20}
+          />
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => mutateAliasData()}
-              className="bg-primary-50 size-9 rounded-full flex items-center justify-center"
+              onClick={handleSaveUsername}
+              className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium"
             >
-              <Icons.refresh className="text-primary size-5" />
+              Save
             </button>
+            <button
+              onClick={() => setIsEditingUsername(false)}
+              className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-full w-full h-14 mt-4 flex items-center justify-between pl-6 pr-2 text-black">
+          {mode === "address" ? (
+            <p className="text-sm">
+              {account?.slice(0, 10)}...{account?.slice(-8)}
+            </p>
           ) : (
+            <p className="text-sm">{username}.privatepay.me</p>
+          )}
+          <div className="flex items-center gap-2">
+            {mode === "username" && (
+              <button
+                onClick={() => setIsEditingUsername(true)}
+                className="bg-primary-50 size-9 rounded-full flex items-center justify-center"
+              >
+                <Icons.edit className="text-primary size-4" />
+              </button>
+            )}
             <button
               onClick={() => setOpenQr(true)}
               className="bg-primary-50 size-9 rounded-full flex items-center justify-center"
             >
               <QrCodeIcon className="size-5" />
             </button>
-          )}
-          <button
-            onClick={onCopy}
-            className="bg-primary-50 size-9 rounded-full flex items-center justify-center"
-          >
-            <CopyIcon className="size-5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TotalBalance() {
-  const [mode, setMode] = useState("available");
-  return (
-    <div
-      className={cnm(
-        "w-full rounded-3xl overflow-hidden transition-colors duration-300",
-        mode === "private" && "bg-oasis-blue"
-      )}
-    >
-      <div className="w-full rounded-3xl bg-neutral-50 z-10">
-        <div className="w-full flex items-center justify-between px-6 py-6">
-          <p className="font-medium text-xl">Total Balance</p>
-          <div className="bg-neutral-200 rounded-full flex relative items-center font-medium">
-            <div
-              className={cnm(
-                "flex items-center justify-center w-24 h-full absolute left-0 rounded-full pl-1 py-1"
-              )}
-            >
-              <div
-                className={cnm(
-                  "flex w-full h-full transition-all ease-in-out rounded-full items-center justify-center",
-                  mode === "available"
-                    ? "translate-x-0 bg-white"
-                    : "translate-x-full bg-oasis-blue"
-                )}
-              ></div>
-            </div>
             <button
-              onClick={() => {
-                setMode("available");
-              }}
-              className={cnm(
-                "w-24 h-10 rounded-full flex items-center justify-center relative transition-colors pl-1",
-                mode === "ens" ? "text-black" : "text-neutral-500"
-              )}
+              onClick={onCopy}
+              className="bg-primary-50 size-9 rounded-full flex items-center justify-center"
             >
-              Available
-            </button>
-            <button
-              onClick={() => {
-                setMode("private");
-              }}
-              className={cnm(
-                "w-24 h-10 rounded-full flex items-center justify-center relative transition-colors pr-1",
-                mode === "private" ? "text-white" : "text-neutral-500"
-              )}
-            >
-              Private
+              <CopyIcon className="size-5" />
             </button>
           </div>
         </div>
-        <BalanceMode mode={mode} />
-      </div>
-      <motion.div
-        initial={{
-          opacity: 0,
-          height: 0,
-        }}
-        animate={{
-          height: mode === "private" ? 40 : 0,
-          opacity: mode === "private" ? 1 : 0,
-        }}
-        transition={{
-          duration: 0.3,
-        }}
-        className="flex items-center justify-center text-white text-xs bg-oasis-blue"
-      >
-        On Oasis Sapphire, your funds stay private and untraceable
-      </motion.div>
+      )}
     </div>
   );
 }
 
-function BalanceMode({ mode }) {
+function BalanceCard({ balance, isLoading }) {
   const navigate = useNavigate();
-  const { assets, userData } = useUser();
-
-  function onNavigate() {
-    if (mode === "available") {
-      navigate("/main-details");
-    }
-    if (mode === "private") {
-      navigate("/private-details");
-    }
-  }
 
   return (
-    <>
-      <div className="w-full relative h-80">
-        <AnimatePresence mode="wait">
-          {mode === "available" ? (
-            <motion.div
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-              }}
-              exit={{
-                opacity: 0,
-              }}
-              className="w-full h-full relative"
-            >
-              <BalanceChart />
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-              }}
-              exit={{
-                opacity: 0,
-              }}
-              className="w-full relative h-full"
-            >
-              <RadarPrivate />
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {!assets ? (
-          <Skeleton className="w-20 h-10 rounded-lg absolute top-2 left-6" />
+    <div className="w-full rounded-3xl bg-neutral-50 overflow-hidden">
+      <div className="w-full flex items-center justify-between px-6 py-6">
+        <p className="font-medium text-xl">Available Balance</p>
+      </div>
+      
+      <div className="w-full px-6 pb-6">
+        {isLoading ? (
+          <Skeleton className="w-32 h-12 rounded-lg" />
         ) : (
-          <p
-            className={cnm(
-              "text-4xl font-semibold absolute transition-all",
-              "left-6 top-2"
-            )}
-          >
-            {formatCurrency(assets.totalBalanceUSD, "USD", "en", false, {
-              significantFigures: 5,
-            })}
-          </p>
+          <div className="flex flex-col gap-2">
+            <p className="text-4xl font-semibold text-primary">
+              {balance.toFixed(4)} APT
+            </p>
+            <p className="text-sm text-gray-500">
+              Held in treasury wallet
+            </p>
+          </div>
         )}
-      </div>
-      <div className="mt-4 w-full flex items-center gap-2 px-6 py-6 text-lg">
-        <Button
-          onClick={onNavigate}
-          className={cnm(
-            " flex-1 rounded-full h-14",
-            mode === "available"
-              ? "bg-primary-50 text-primary"
-              : "bg-oasis-blue/10 text-oasis-blue"
-          )}
-        >
-          Details
-        </Button>
-        <Button
-          onClick={() => {
-            navigate(
-              `/${userData.username}.squidl.me/transfer?type=${
-                mode === "private" ? "private" : "main"
-              }`
-            );
-          }}
-          className={cnm(
-            " flex-1 rounded-full h-14",
-            mode === "available"
-              ? "bg-primary text-white"
-              : "bg-oasis-blue text-white"
-          )}
-        >
-          Transfer
-        </Button>
-      </div>
-    </>
-  );
-}
 
-function RadarPrivate() {
-  return (
-    <div
-      style={{
-        mask: `linear-gradient(0deg, transparent, #000 20%, #000 80%, transparent 100%)`,
-      }}
-      className="w-full h-full relative overflow-hidden"
-    >
-      <div className="w-full h-full absolute translate-y-1/2">
-        <img
-          src="/assets/radar-bg.png"
-          alt="radar-bg"
-          className="w-full h-full object-contain scale-[1.4] absolute"
-        />
-        <div className="w-full h-full relative">
-          <div className="private-radar-scanner"></div>
-          <div className="w-full h-full absolute">
-            {/* Icon 1 */}
-            <div className="absolute left-1/2 -translate-x-1/2 top-12">
-              <div className="relative flex items-center justify-center">
-                <div className="size-8 rounded-full bg-oasis-blue/10 animate-pulse"></div>
-                <div className="size-5 rounded-full bg-oasis-blue/80 absolute animate-pulse flex items-center justify-center">
-                  <Lock className="size-3 text-white" />
-                </div>
-              </div>
-            </div>
-            {/* Icon 2 */}
-            <div className="absolute left-20 top-16">
-              <div className="relative flex items-center justify-center">
-                <div className="size-8 rounded-full bg-oasis-blue/10 animate-pulse"></div>
-                <div className="size-5 rounded-full bg-oasis-blue/80 absolute animate-pulse flex items-center justify-center">
-                  <Handshake className="size-3 text-white" />
-                </div>
-              </div>
-            </div>
-            {/* Icon 1 */}
-            <div className="absolute right-24 top-24">
-              <div className="relative flex items-center justify-center">
-                <div className="size-8 rounded-full bg-oasis-blue/10 animate-pulse"></div>
-                <div className="size-5 rounded-full bg-oasis-blue/80 absolute animate-pulse flex items-center justify-center">
-                  <Fingerprint className="size-3 text-white" />
-                </div>
-              </div>
-            </div>
+        <div className="mt-6 w-full flex flex-col items-center gap-2">
+          <Button
+            onClick={() => navigate("/send")}
+            className="w-full rounded-full h-14 bg-primary text-white font-semibold"
+          >
+            Send Payment
+          </Button>
+          <div className="w-full flex items-center gap-2">
+            <Button
+              onClick={() => navigate("/transfer")}
+              className="flex-1 rounded-full h-12 bg-primary-50 text-primary"
+            >
+              Withdraw
+            </Button>
+            <Button
+              onClick={() => navigate("/transactions")}
+              className="flex-1 rounded-full h-12 bg-primary-50 text-primary"
+            >
+              History
+            </Button>
           </div>
         </div>
       </div>

@@ -6,8 +6,10 @@ import { isBackAtom } from "../../../store/payment-card-store.js";
 import { Button, Skeleton } from "@nextui-org/react";
 import { isCreateLinkDialogAtom } from "../../../store/dialog-store.js";
 import SquidLogo from "../../../assets/squidl-logo.svg?react";
-import { formatCurrency } from "@coingecko/cryptoformat";
-import { useUser } from "../../../providers/UserProvider.jsx";
+import { useAptos } from "../../../providers/AptosProvider.jsx";
+import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+import { getPaymentLinks } from "../../../lib/supabase.js";
 
 export const AVAILABLE_CARDS_BG = [
   "/assets/card-1.png",
@@ -19,10 +21,41 @@ export const AVAILABLE_CARDS_BG = [
 export const CARDS_SCHEME = [0, 1, 2, 3];
 
 export default function PaymentLinksDashboard({ user }) {
-  const { assets } = useUser();
+  const { account, isConnected } = useAptos();
   const [, setOpen] = useAtom(isCreateLinkDialogAtom);
   const navigate = useNavigate();
   const isBackValue = useAtomValue(isBackAtom);
+  const [paymentLinks, setPaymentLinks] = useState([]);
+  const [username, setUsername] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadPaymentLinks = async () => {
+    if (account) {
+      // Get username
+      const savedUsername = localStorage.getItem(`aptos_username_${account}`);
+      setUsername(savedUsername || account.slice(2, 8));
+
+      // Get payment links from Supabase
+      const links = await getPaymentLinks(account);
+      setPaymentLinks(links);
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPaymentLinks();
+
+    // Listen for payment links updates
+    const handleUpdate = () => {
+      loadPaymentLinks();
+    };
+
+    window.addEventListener('payment-links-updated', handleUpdate);
+
+    return () => {
+      window.removeEventListener('payment-links-updated', handleUpdate);
+    };
+  }, [account]);
 
   return (
     <div
@@ -65,45 +98,28 @@ export default function PaymentLinksDashboard({ user }) {
           See More
         </Button>
       </motion.div>
-      {!assets ? (
-        // create stacked skeleton
-
+      {isLoading ? (
         <div className="w-full px-6 py-4">
           <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
       ) : (
         <div className="w-full flex flex-col px-6">
-          {assets && assets.aliasesList && assets.aliasesList.length > 0 ? (
-            assets.aliasesList.slice(0, 4).map((alias, idx) => {
+          {paymentLinks && paymentLinks.length > 0 ? (
+            paymentLinks.slice(0, 4).map((link, idx) => {
               const bgImage =
                 AVAILABLE_CARDS_BG[idx % AVAILABLE_CARDS_BG.length];
-              const userAlias = alias.alias
-                ? `${alias.alias}.${user?.username}`
-                : user?.username;
               const colorScheme = CARDS_SCHEME[idx % CARDS_SCHEME.length];
-
-              let cardName = "";
-
-              if (alias.alias === "") {
-                cardName = `${user?.username}.squidl.me`;
-              } else {
-                cardName = `${alias.alias}.${user?.username}.squidl.me`;
-              }
+              const cardName = `${link.alias}.privatepay.me`;
 
               return (
                 <motion.button
                   key={idx}
-                  onClick={() =>
-                    navigate(
-                      `/${userAlias}/detail/1?scheme=${colorScheme}&id=${alias.id}`,
-                      {
-                        state: { layoutId: `payment-card-${userAlias}-1` },
-                        preventScrollReset: false,
-                      }
-                    )
-                  }
+                  onClick={() => {
+                    // Copy link to clipboard
+                    navigator.clipboard.writeText(cardName);
+                    toast.success("Link copied to clipboard!");
+                  }}
                   layout
-                  layoutId={`payment-card-${userAlias}-1`}
                   transition={{ duration: 0.4 }}
                   className={cnm(
                     "relative rounded-2xl h-60 w-full flex items-start",
@@ -128,11 +144,7 @@ export default function PaymentLinksDashboard({ user }) {
                     )}
                   >
                     <p className="font-medium">{cardName}</p>
-                    <p>
-                      {formatCurrency(alias.balanceUSD, "USD", "en", false, {
-                        significantFigures: 5,
-                      })}
-                    </p>
+                    <p>$0.00</p>
                   </div>
 
                   <div className="absolute left-5 bottom-6 flex items-center justify-between">
@@ -144,16 +156,11 @@ export default function PaymentLinksDashboard({ user }) {
                           : "text-white"
                       )}
                     >
-                      SQUIDL
+                      PRIVATEPAY
                     </h1>
                   </div>
 
                   <div className="absolute right-5 bottom-6 flex items-center justify-between">
-                    {/* <img
-                      src="/assets/squidl-logo-only.png"
-                      alt="logo"
-                      className="object-contain w-12 h-16 invert"
-                    /> */}
                     <SquidLogo
                       className={cnm(
                         "w-12 ",

@@ -10,10 +10,7 @@ import PaymentLinksPage from "./pages/PaymentLinksPage.jsx";
 import TransactionsPage from "./pages/TransactionsPage.jsx";
 import MainBalancePage from "./pages/MainBalancePage.jsx";
 import PrivateBalancePage from "./pages/PrivateBalancePage.jsx";
-import AptosPage from "./pages/AptosPage.jsx";
-import MinimalProvider from "./providers/MinimalProvider.jsx";
-import RootProvider from "./providers/RootProvider.jsx";
-import { RootLayout } from "./layouts/RootLayout.jsx";
+import SendPage from "./pages/SendPage.jsx";
 
 const EXCLUDED_SUBDOMAINS = [
   "www",
@@ -36,22 +33,7 @@ const EXCLUDED_SUBDOMAINS = [
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: (
-      <MinimalProvider>
-        <AptosPage />
-      </MinimalProvider>
-    ),
-    errorElement: <ErrorPage />,
-  },
-  {
-    path: "/dashboard",
-    element: (
-      <RootProvider>
-        <RootLayout>
-          <AuthLayout />
-        </RootLayout>
-      </RootProvider>
-    ),
+    element: <AuthLayout />,
     loader: () => {
       const host = window.location.hostname;
       const suffix = `.${import.meta.env.VITE_WEBSITE_HOST}`;
@@ -68,11 +50,11 @@ export const router = createBrowserRouter([
     errorElement: <ErrorPage />,
     children: [
       {
-        index: true,
+        path: "/",
         element: <IndexPage />,
       },
       {
-        path: ":alias/detail/:parent",
+        path: "/:alias/detail/:parent",
         loader: ({ params, request }) => {
           const url = new URL(request.url);
           const id = url.searchParams.get("id");
@@ -88,24 +70,32 @@ export const router = createBrowserRouter([
         ],
       },
       {
-        path: ":alias/transfer",
+        path: "/:alias/transfer",
         element: <TransferPage />,
       },
       {
-        path: "payment-links",
+        path: "/payment-links",
         element: <PaymentLinksPage />,
       },
       {
-        path: "transactions",
+        path: "/transactions",
         element: <TransactionsPage />,
       },
       {
-        path: "main-details",
+        path: "/main-details",
         element: <MainBalancePage />,
       },
       {
-        path: "private-details",
+        path: "/private-details",
         element: <PrivateBalancePage />,
+      },
+      {
+        path: "/send",
+        element: <SendPage />,
+      },
+      {
+        path: "/transfer",
+        element: <TransferPage />,
       },
     ],
   },
@@ -119,14 +109,5 @@ export const router = createBrowserRouter([
         element: <PaymentPage />,
       },
     ],
-  },
-  {
-    path: "/aptos",
-    element: (
-      <MinimalProvider>
-        <AptosPage />
-      </MinimalProvider>
-    ),
-    errorElement: <ErrorPage />,
   },
 ]);

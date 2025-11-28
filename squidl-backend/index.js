@@ -12,6 +12,7 @@ import { userRoutes } from "./app/routes/user/userRoutes.js";
 import { tokenPriceWorker } from "./app/workers/tokenPriceWorkers.js";
 import { stealthSignerRoutes } from "./app/routes/stealth-signer/index.js";
 import { transactionWorker } from "./app/workers/transactionWorker/transactionWorkers.js";
+import { treasuryRoutes } from "./app/routes/treasury/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +56,10 @@ fastify.register(userRoutes, {
 
 fastify.register(stealthSignerRoutes, {
   prefix: "/stealth-signer",
+});
+
+fastify.register(treasuryRoutes, {
+  prefix: "/treasury",
 });
 
 /* --------------------------------- Workers -------------------------------- */
