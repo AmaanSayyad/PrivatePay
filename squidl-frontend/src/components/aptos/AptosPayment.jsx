@@ -134,21 +134,36 @@ export default function AptosPayment() {
         )}
       </div>
 
-      {/* Meta Address Registration */}
-      {isConnected && !isRegistered && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-neutral-800">Register Meta Address</h3>
+      {/* Generate Keys Section - Always visible */}
+      {!isRegistered && (
+        <div className="flex flex-col gap-4 p-4 bg-primary-50 rounded-3xl border border-primary-200">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-neutral-800">Step 1: Generate Keys</h3>
+            </div>
+            <p className="text-sm text-neutral-600">
+              Generate your spend and viewing public keys. You can generate keys before connecting your wallet.
+            </p>
             <Button
-              color="secondary"
-              variant="bordered"
+              color="primary"
+              variant="solid"
               onClick={handleGenerateKeys}
-              className="rounded-full"
-              size="sm"
+              className="w-full h-12 rounded-full font-semibold"
+              size="lg"
             >
               Generate Keys
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Meta Address Registration */}
+      {isConnected && !isRegistered && (
+        <div className="flex flex-col gap-4 p-4 bg-neutral-50 rounded-3xl border border-neutral-200">
+          <h3 className="text-lg font-semibold text-neutral-800">Step 2: Register Meta Address</h3>
+          <p className="text-sm text-neutral-600">
+            Connect your wallet and register your meta address on the blockchain.
+          </p>
           
           <Input
             label="Spend Public Key"

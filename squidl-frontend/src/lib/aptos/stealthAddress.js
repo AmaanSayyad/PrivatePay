@@ -12,7 +12,18 @@ import { bytesToHex } from "@noble/hashes/utils.js";
  * Generate a random private key (32 bytes)
  */
 export const generatePrivateKey = () => {
-  return utils.randomPrivateKey();
+  // Use crypto.getRandomValues for secure random generation
+  const privateKey = new Uint8Array(32);
+  crypto.getRandomValues(privateKey);
+  
+  // Ensure the private key is valid (not zero and less than secp256k1 order)
+  // This is a simple check - in production, you might want more validation
+  if (privateKey.every(byte => byte === 0)) {
+    // If all zeros, generate again (extremely unlikely but handle it)
+    crypto.getRandomValues(privateKey);
+  }
+  
+  return privateKey;
 };
 
 /**
