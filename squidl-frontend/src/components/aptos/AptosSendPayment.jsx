@@ -76,9 +76,23 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
       return;
     }
 
+    if (!isConnected || !account) {
+      toast.error("Please connect your Aptos wallet first");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const amountOctas = parseFloat(amount) * 100000000; // Convert APT to octas
+
+      console.log("Sending payment with:", {
+        account,
+        recipientAddress: recipientAddress || account,
+        recipientMetaIndex,
+        amount: amountOctas,
+        ephemeralPubKey,
+        stealthAddress,
+      });
 
       const result = await sendAptosStealthPayment({
         accountAddress: account,
@@ -91,15 +105,30 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
         isTestnet: true,
       });
 
-      toast.success("Payment sent successfully!", {
-        duration: 5000,
-      });
+      // Extract transaction hash for display
+      const txHash = result.hash || result.explorerUrl?.split('/txn/')[1]?.split('?')[0] || '';
+      const shortHash = txHash.length > 10 ? `${txHash.slice(0, 6)}...${txHash.slice(-4)}` : txHash;
       
       if (result.explorerUrl) {
+        const explorerUrl = result.explorerUrl;
         toast.success(
-          `View transaction: ${result.explorerUrl}`,
-          { duration: 10000 }
+          (t) => (
+            <div 
+              onClick={() => {
+                window.open(explorerUrl, '_blank');
+                toast.dismiss(t.id);
+              }}
+              className="cursor-pointer hover:underline"
+            >
+              Payment sent! TX: {shortHash} (click to view)
+            </div>
+          ),
+          {
+            duration: 8000,
+          }
         );
+      } else {
+        toast.success("Payment sent successfully!", { duration: 5000 });
       }
 
       // Reset form
@@ -107,8 +136,8 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
       setStealthAddress("");
       setEphemeralPubKey("");
     } catch (error) {
-      toast.error("Failed to send payment");
-      console.error(error);
+      console.error("Payment error:", error);
+      toast.error(error.message || "Failed to send payment. Check console for details.");
     } finally {
       setIsLoading(false);
     }

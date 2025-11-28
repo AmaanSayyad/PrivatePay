@@ -60,9 +60,42 @@ export { hexToBytes };
  * ECDH: Compute shared secret between private key and public key
  */
 export const computeSharedSecret = (privateKey, publicKey) => {
-  const point = Point.fromHex(publicKey);
-  const sharedPoint = point.multiply(privateKey);
-  const sharedSecret = sharedPoint.toRawBytes(true); // compressed
+  // publicKey can be Uint8Array or hex string
+  let publicKeyHex;
+  if (publicKey instanceof Uint8Array) {
+    publicKeyHex = bytesToHex(publicKey);
+  } else {
+    publicKeyHex = publicKey.startsWith("0x") ? publicKey.slice(2) : publicKey;
+  }
+  
+  // Convert private key to bigint if it's Uint8Array
+  // Manual conversion from bytes to bigint (big-endian)
+  let privateKeyBigInt;
+  if (privateKey instanceof Uint8Array) {
+    let result = 0n;
+    for (let i = 0; i < privateKey.length; i++) {
+      result = result * 256n + BigInt(privateKey[i]);
+    }
+    privateKeyBigInt = result;
+  } else if (typeof privateKey === "string") {
+    const privKeyBytes = hexToBytes(privateKey);
+    let result = 0n;
+    for (let i = 0; i < privKeyBytes.length; i++) {
+      result = result * 256n + BigInt(privKeyBytes[i]);
+    }
+    privateKeyBigInt = result;
+  } else {
+    privateKeyBigInt = privateKey;
+  }
+  
+  const point = Point.fromHex(publicKeyHex);
+  const sharedPoint = point.multiply(privateKeyBigInt);
+  
+  // Convert Point to compressed public key bytes
+  // Use toHex and convert to bytes (toRawBytes might not be available in all versions)
+  const sharedPointHex = sharedPoint.toHex(true); // compressed (33 bytes)
+  const sharedSecret = hexToBytes(sharedPointHex);
+  
   return sharedSecret;
 };
 
@@ -100,25 +133,41 @@ export const generateStealthAddress = (
     const tweakInput = new Uint8Array(sharedSecret.length + 4);
     tweakInput.set(sharedSecret, 0);
     tweakInput.set(kBytes, sharedSecret.length);
-    const tweak = sha256(tweakInput);
+    const tweakBytes = sha256(tweakInput);
+
+    // Convert tweak bytes to bigint for multiplication
+    let tweakBigInt = 0n;
+    for (let i = 0; i < tweakBytes.length; i++) {
+      tweakBigInt = tweakBigInt * 256n + BigInt(tweakBytes[i]);
+    }
 
     // Compute stealth public key: stealth_pub = spend_pub + tweak * G
     // tweak * G: multiply generator point by tweak
-    const tweakPoint = Point.BASE.multiply(tweak);
-    const tweakPubKey = tweakPoint.toRawBytes(true); // compressed
+    const tweakPoint = Point.BASE.multiply(tweakBigInt);
+    // Convert Point to hex and then to bytes
+    const tweakPubKeyHex = tweakPoint.toHex(true); // compressed
+    const tweakPubKey = hexToBytes(tweakPubKeyHex);
     
     // Point addition: spend_pub + tweak_pub
-    const spendPoint = Point.fromHex(spendPubKey);
-    const tweakPubPoint = Point.fromHex(tweakPubKey);
+    // Convert bytes to hex for Point.fromHex
+    const spendPubKeyHexStr = bytesToHex(spendPubKey);
+    const tweakPubKeyHexStr = bytesToHex(tweakPubKey);
+    const spendPoint = Point.fromHex(spendPubKeyHexStr);
+    const tweakPubPoint = Point.fromHex(tweakPubKeyHexStr);
     const stealthPubPoint = spendPoint.add(tweakPubPoint);
-    const stealthPubKey = stealthPubPoint.toRawBytes(true); // compressed
+    // Convert Point to hex and then to bytes
+    const stealthPubKeyHex = stealthPubPoint.toHex(true); // compressed
+    const stealthPubKey = hexToBytes(stealthPubKeyHex);
 
     // Derive Aptos address from stealth public key using SHA3-256
     const addressHash = sha3_256(stealthPubKey);
     
     // Take first 16 bytes for Aptos address
-    const addressBytes = addressHash.slice(0, 16);
-    const stealthAddress = "0x" + bytesToHex(addressBytes);
+    const addressBytes16 = addressHash.slice(0, 16);
+    // Convert to hex and pad to 64 characters (32 bytes) by adding zeros at the beginning
+    const addressHex = bytesToHex(addressBytes16); // 32 hex characters (16 bytes)
+    const paddedAddressHex = addressHex.padStart(64, '0'); // Pad to 64 hex characters (32 bytes)
+    const stealthAddress = "0x" + paddedAddressHex;
 
     // View hint: first byte of shared secret
     const viewHint = bytesToHex(new Uint8Array([sharedSecret[0]]));

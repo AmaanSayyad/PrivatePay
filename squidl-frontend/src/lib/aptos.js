@@ -72,6 +72,7 @@ export const signAndSubmitTransaction = async ({
   accountAddress,
   functionName,
   functionArguments,
+  typeArguments = [],
   isTestnet = true,
 }) => {
   try {
@@ -79,10 +80,12 @@ export const signAndSubmitTransaction = async ({
       throw new Error("Aptos wallet not found");
     }
 
-    // Handle type arguments for coin types
-    const typeArgs = functionName.includes("send_private_payment") 
-      ? ["0x1::aptos_coin::AptosCoin"]
-      : [];
+    // Use provided typeArguments or default based on function name
+    const typeArgs = typeArguments.length > 0 
+      ? typeArguments
+      : (functionName.includes("send_private_payment") 
+          ? ["0x1::aptos_coin::AptosCoin"]
+          : []);
 
     const transaction = {
       type: "entry_function_payload",
@@ -91,6 +94,8 @@ export const signAndSubmitTransaction = async ({
       type_arguments: typeArgs,
     };
 
+    console.log("Transaction payload:", JSON.stringify(transaction, null, 2));
+    
     const response = await window.aptos.signAndSubmitTransaction(transaction);
     
     // Wait for transaction
@@ -144,19 +149,25 @@ export const sendAptosStealthPayment = async ({
   stealthAddress,
   isTestnet = true,
 }) => {
+  // Convert ephemeralPubKey from hex string to Uint8Array (vector<u8>)
   const ephemeralPubKeyBytes = hexToBytes(ephemeralPubKey);
-  const stealthAddressBytes = hexToBytes(stealthAddress.replace("0x", ""));
+  
+  // stealthAddress should be a string (address format), not bytes
+  // Ensure it starts with 0x and is the correct format
+  const stealthAddressStr = stealthAddress.startsWith("0x") 
+    ? stealthAddress 
+    : `0x${stealthAddress}`;
 
   return await signAndSubmitTransaction({
     accountAddress,
     functionName: "payment_manager::send_private_payment",
     functionArguments: [
-      recipientAddress,
-      recipientMetaIndex,
-      amount,
-      k,
-      ephemeralPubKeyBytes,
-      stealthAddressBytes,
+      recipientAddress,        // address (string)
+      recipientMetaIndex,       // u64 (number)
+      amount,                   // u64 (number)
+      k,                        // u32 (number)
+      ephemeralPubKeyBytes,     // vector<u8> (Uint8Array/Array)
+      stealthAddressStr,        // address (string)
     ],
     typeArguments: ["0x1::aptos_coin::AptosCoin"],
     isTestnet,
