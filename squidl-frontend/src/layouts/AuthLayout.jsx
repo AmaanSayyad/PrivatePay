@@ -52,7 +52,7 @@ export default function AuthLayout() {
 
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center text-center mb-4">
-            <img src="/assets/squidl-logo.svg" className="w-36" />
+            <img src="/assets/squidl-only.svg" className="w-36" />
             <div className="text-md font-medium opacity-50 mt-2">
               Stealth Addresses for Untraceable Payments.
             </div>

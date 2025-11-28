@@ -18,6 +18,7 @@ import { CARDS_SCHEME } from "../home/dashboard/PaymentLinksDashboard.jsx";
 import SquidLogo from "../../assets/squidl-logo.svg?react";
 import { cnm } from "../../utils/style.js";
 import { createPaymentLink, getPaymentLinks } from "../../lib/supabase.js";
+import { usePhoton } from "../../providers/PhotonProvider.jsx";
 
 const confettiConfig = {
   angle: 90, // Angle at which the confetti will explode
@@ -111,6 +112,7 @@ function StepOne({
   setInitialAliasCount,
 }) {
   const { account } = useAptos();
+  const { trackUnrewardedEvent } = usePhoton();
 
   async function handleUpdate() {
     if (!alias) {
@@ -137,6 +139,13 @@ function StepOne({
       setInitialAliasCount(paymentLinks.length);
 
       toast.success("Your payment link has been created!");
+      
+      // Track unrewarded event for attribution
+      trackUnrewardedEvent("payment_link_created", {
+        alias: alias,
+        username: currentUsername,
+        totalLinks: paymentLinks.length,
+      });
       
       // Trigger a custom event to refresh the dashboard
       window.dispatchEvent(new Event('payment-links-updated'));

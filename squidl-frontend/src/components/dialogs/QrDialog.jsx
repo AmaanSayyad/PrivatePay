@@ -72,7 +72,7 @@ export default function QrDialog({ open, setOpen, qrUrl }) {
 
         <div className="flex flex-col items-center gap-2">
           <img
-            src="/assets/squidl-logo.svg"
+            src="/assets/squidl-only.svg"
             alt="logo"
             className="object-contain w-auto h-10"
           />

@@ -11,6 +11,7 @@ import { Icons } from "../../shared/Icons.jsx";
 import { useNavigate } from "react-router-dom";
 import { useAptos } from "../../../providers/AptosProvider.jsx";
 import { getUserBalance, registerUser } from "../../../lib/supabase.js";
+import PhotonWalletDisplay from "../../shared/PhotonWalletDisplay.jsx";
 
 export default function Dashboard() {
   const [openQr, setOpenQr] = useState(false);
@@ -63,6 +64,7 @@ export default function Dashboard() {
           <div className="w-full max-w-md flex flex-col items-center gap-4 pt-12 pb-20">
             <ReceiveCard setOpenQr={setOpenQr} />
             <BalanceCard balance={balance} isLoading={isLoadingBalance} />
+            <PhotonWalletDisplay />
             <PaymentLinksDashboard />
           </div>
         </div>

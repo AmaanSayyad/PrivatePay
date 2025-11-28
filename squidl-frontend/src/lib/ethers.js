@@ -91,7 +91,7 @@ async function main() {
 
     if (addr1 !== address1) {
       console.log("Uh oh. The address is incorrect!", [address1, addr1]);
-      process.exit(1);
+      throw new Error("Address is incorrect");
     }
 
     const wallet1 = new ethers.Wallet(key1);
@@ -100,7 +100,7 @@ async function main() {
         address1,
         wallet1.address,
       ]);
-      process.exit(1);
+      throw new Error("Stealth key is incorrect");
     }
 
     const [address2, ePub2, tag2] = await stealthSigner
@@ -124,7 +124,7 @@ async function main() {
 
     if (addr2 !== address2) {
       console.log("Uh oh. The address is incorrect!", [address2, addr2]);
-      process.exit(1);
+      throw new Error("Address is incorrect");
     }
 
     const wallet2 = new ethers.Wallet(key2);
@@ -133,7 +133,7 @@ async function main() {
         address2,
         wallet2.address,
       ]);
-      process.exit(1);
+      throw new Error("Stealth key is incorrect");
     }
 
     const nonce = 0;

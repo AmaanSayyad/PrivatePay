@@ -145,6 +145,14 @@ export const customEvmNetworks =
     ? TESTNET_CHAINS
     : MAINNET_CHAINS;
 
+// Photon Configuration
+export const PHOTON_CONFIG = {
+  apiBaseUrl: "https://stage-api.getstan.app/identity-service/api/v1",
+  apiKey: import.meta.env.VITE_PHOTON_API_KEY,
+  campaignId: import.meta.env.VITE_PHOTON_CAMPAIGN_ID,
+  enabled: Boolean(import.meta.env.VITE_PHOTON_API_KEY && import.meta.env.VITE_PHOTON_CAMPAIGN_ID),
+};
+
 export const CHAINS = [
   // Mainnet Chains
   {

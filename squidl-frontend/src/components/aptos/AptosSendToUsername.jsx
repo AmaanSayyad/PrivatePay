@@ -4,11 +4,13 @@ import { useAptos } from "../../providers/AptosProvider";
 import { sendAptTransfer } from "../../lib/aptos";
 import { recordPayment, getUserByUsername, getPaymentLinkByAlias } from "../../lib/supabase";
 import toast from "react-hot-toast";
+import { usePhoton } from "../../providers/PhotonProvider.jsx";
 
 const TREASURY_WALLET = import.meta.env.VITE_TREASURY_WALLET_ADDRESS;
 
 export default function AptosSendToUsername() {
   const { account, isConnected } = useAptos();
+  const { trackRewardedEvent } = usePhoton();
   const [isLoading, setIsLoading] = useState(false);
   const [username, setUsername] = useState("");
   const [amount, setAmount] = useState("");
@@ -90,6 +92,15 @@ export default function AptosSendToUsername() {
         ),
         { duration: 8000 }
       );
+
+      // Track rewarded event for successful username payment
+      trackRewardedEvent("aptos_username_payment_sent", {
+        amount: parseFloat(amount),
+        tokenSymbol: "APT",
+        recipientUsername: username,
+        recipientActualUsername: recipientUsername,
+        txHash: result.hash.slice(0, 10),
+      });
 
       // Reset form
       setUsername("");

@@ -11,10 +11,12 @@ import OnRampDialog from "../dialogs/OnrampDialog.jsx";
 import SuccessDialog from "../dialogs/SuccessDialog.jsx";
 import Chains from "../shared/Chains.jsx";
 import { Icons } from "../shared/Icons.jsx";
+import { usePhoton } from "../../providers/PhotonProvider.jsx";
 
 export default function Payment() {
   const isLoggedIn = useIsLoggedIn();
   const loaderData = useLoaderData();
+  const { trackUnrewardedEvent } = usePhoton();
 
   const [openOnramp, setOpenOnramp] = useState(false);
   const [openSuccess, setOpenSuccess] = useState(false);
@@ -33,6 +35,15 @@ export default function Payment() {
       try {
         const { data } = await squidlPublicAPI.get(url);
         console.log("aliasData", data);
+        
+        // Track unrewarded event for payment page view
+        if (data) {
+          trackUnrewardedEvent("payment_page_viewed", {
+            alias: alias,
+            recipientUsername: data.user?.username,
+          });
+        }
+        
         return data;
       } catch (error) {
         console.error("Error fetching alias data", error);
@@ -97,7 +108,7 @@ export default function Payment() {
       >
         <div className="w-36">
           <img
-            src="/assets/squidl-logo.svg"
+            src="/assets/squidl-only.svg"
             alt="squidl-logo"
             className="w-full h-full object-contain"
           />
