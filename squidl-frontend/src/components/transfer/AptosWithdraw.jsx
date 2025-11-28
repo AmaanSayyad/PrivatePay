@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button, Input } from "@nextui-org/react";
 import { useAptos } from "../../providers/AptosProvider";
-import { getUserBalance, withdrawFunds } from "../../lib/supabase";
+import { getUserBalance } from "../../lib/supabase";
+import { getAptosBalance } from "../../lib/aptos";
 import toast from "react-hot-toast";
 import { Icons } from "../shared/Icons";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +11,7 @@ export function AptosWithdraw() {
   const { account, isConnected, connect } = useAptos();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(true);
   const [amount, setAmount] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
   const [balance, setBalance] = useState(0);
@@ -18,16 +20,35 @@ export function AptosWithdraw() {
   useEffect(() => {
     async function loadBalance() {
       if (account) {
+        setIsLoadingBalance(true);
         const savedUsername = localStorage.getItem(`aptos_username_${account}`);
         const currentUsername = savedUsername || account.slice(2, 8);
         setUsername(currentUsername);
 
-        const balanceData = await getUserBalance(currentUsername);
-        setBalance(balanceData?.available_balance || 0);
+        try {
+          const balanceData = await getUserBalance(currentUsername);
+          setBalance(balanceData?.available_balance || 0);
+        } catch (error) {
+          console.error('Error loading balance:', error);
+          setBalance(0);
+        } finally {
+          setIsLoadingBalance(false);
+        }
       }
     }
 
     loadBalance();
+
+    // Listen for balance updates
+    const handleBalanceUpdate = () => {
+      loadBalance();
+    };
+
+    window.addEventListener('balance-updated', handleBalanceUpdate);
+
+    return () => {
+      window.removeEventListener('balance-updated', handleBalanceUpdate);
+    };
   }, [account]);
 
   const handleBack = () => {
@@ -61,43 +82,40 @@ export function AptosWithdraw() {
 
     setIsLoading(true);
     try {
-      // Call withdrawal API
-      const response = await fetch('/api/withdraw', {
+      toast.loading("Processing withdrawal...", { id: "withdraw" });
+
+      // Treasury'den kullanıcıya transfer yapılacak
+      // Backend API'ye istek gönder (treasury private key backend'de olmalı)
+      const response = await fetch('/api/aptos-withdraw', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          destinationAddress,
+          username,
           amount: parseFloat(amount),
+          destinationAddress,
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Withdrawal failed');
+        const error = await response.json();
+        throw new Error(error.message || 'Withdrawal failed');
       }
 
-      // Record withdrawal in Supabase
-      await withdrawFunds(username, parseFloat(amount), destinationAddress, data.txHash);
+      const { txHash, newBalance } = await response.json();
 
-      const shortHash = data.txHash.slice(0, 6) + "..." + data.txHash.slice(-4);
+      toast.dismiss("withdraw");
+      
+      const shortHash = txHash.slice(0, 6) + "..." + txHash.slice(-4);
       
       toast.success(
-        (t) => (
-          <div 
-            onClick={() => {
-              window.open(data.explorerUrl, '_blank');
-              toast.dismiss(t.id);
-            }}
-            className="cursor-pointer hover:underline"
-          >
-            Withdrawal successful! TX: {shortHash} (click to view)
-          </div>
-        ),
+        `Withdrawal successful! ${parseFloat(amount).toFixed(4)} APT sent to ${destinationAddress.slice(0, 6)}...${destinationAddress.slice(-4)}`,
         { duration: 8000 }
       );
+
+      // Update local balance
+      setBalance(newBalance);
 
       // Trigger balance update
       window.dispatchEvent(new Event('balance-updated'));
@@ -112,6 +130,7 @@ export function AptosWithdraw() {
       }, 2000);
     } catch (error) {
       console.error("Withdrawal error:", error);
+      toast.dismiss("withdraw");
       toast.error(error.message || "Failed to process withdrawal");
     } finally {
       setIsLoading(false);
@@ -147,89 +166,116 @@ export function AptosWithdraw() {
   }
 
   return (
-    <div className="relative flex flex-col w-full max-w-md items-start justify-center bg-light-white rounded-[32px] p-4 md:p-6">
-      <div className="relative flex gap-4 w-full items-center justify-center">
-        <h1 className="absolute text-[#161618] font-bold">Withdraw Funds</h1>
+    <div className="relative flex flex-col w-full max-w-md items-start justify-center bg-neutral-50 rounded-[32px] p-6">
+      {/* Header */}
+      <div className="relative flex gap-4 w-full items-center justify-center mb-8">
+        <h1 className="absolute text-[#161618] font-bold text-xl">Withdraw Funds</h1>
         <button
           onClick={handleBack}
-          className="relative flex w-fit mr-auto items-center justify-center bg-white rounded-full size-11"
+          className="relative flex w-fit mr-auto items-center justify-center bg-white rounded-full size-11 hover:bg-gray-100 transition-colors"
         >
           <Icons.back className="text-black size-6" />
         </button>
       </div>
 
-      <div className="flex flex-col gap-4 w-full mt-12">
-        {/* Available Balance */}
-        <div className="bg-primary-50 rounded-2xl p-4 border border-primary-200">
-          <p className="text-xs text-gray-600 mb-1">Available Balance</p>
-          <p className="text-2xl font-bold text-primary">{balance.toFixed(4)} APT</p>
-          <p className="text-xs text-gray-500 mt-1">From treasury wallet</p>
+      <div className="flex flex-col gap-4 w-full">
+        {/* Available Balance Card */}
+        <div className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-3xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm opacity-90">Available Balance</p>
+            <div className="bg-white/20 rounded-full px-3 py-1">
+              <p className="text-xs font-medium">APT</p>
+            </div>
+          </div>
+          {isLoadingBalance ? (
+            <div className="flex items-center gap-2">
+              <div className="animate-pulse bg-white/30 h-10 w-32 rounded-lg"></div>
+            </div>
+          ) : (
+            <>
+              <p className="text-4xl font-bold mb-1">{balance.toFixed(4)}</p>
+              <p className="text-xs opacity-75">Held in treasury wallet</p>
+            </>
+          )}
         </div>
 
-        {/* Amount */}
+        {/* Amount Input */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-sm text-[#A1A1A3]">Amount (APT)</h1>
+          <h1 className="text-sm text-[#A1A1A3] font-medium">Amount (APT)</h1>
           <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              placeholder="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              classNames={{
-                input: "rounded-full",
-                inputWrapper: "rounded-full h-16",
-              }}
-            />
+            <div className="flex-1 relative">
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                classNames={{
+                  input: "text-lg font-medium",
+                  inputWrapper: "rounded-2xl h-16 bg-white border-2 border-gray-200 hover:border-primary-300 transition-colors",
+                }}
+                disabled={isLoadingBalance || balance === 0}
+              />
+            </div>
             <Button
               onClick={() => setAmount(balance.toString())}
-              className="h-16 px-6 rounded-full bg-primary-50 text-primary font-medium"
+              isDisabled={isLoadingBalance || balance === 0}
+              className="h-16 px-6 rounded-2xl bg-primary-50 text-primary font-semibold hover:bg-primary-100 transition-colors"
             >
               Max
             </Button>
           </div>
           {amount && parseFloat(amount) > balance && (
-            <p className="text-red-500 text-sm">Insufficient balance</p>
+            <p className="text-red-500 text-sm flex items-center gap-1">
+              <span>⚠️</span> Insufficient balance
+            </p>
           )}
         </div>
 
         {/* Destination Address */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-sm text-[#A1A1A3]">Destination Address</h1>
+          <h1 className="text-sm text-[#A1A1A3] font-medium">Destination Address</h1>
           <Input
             placeholder="0x..."
             value={destinationAddress}
             onChange={(e) => setDestinationAddress(e.target.value)}
             classNames={{
-              input: "rounded-full",
-              inputWrapper: "rounded-full h-16",
+              input: "text-sm font-mono",
+              inputWrapper: "rounded-2xl h-16 bg-white border-2 border-gray-200 hover:border-primary-300 transition-colors",
             }}
           />
           <Button
             size="sm"
             variant="light"
             onClick={() => setDestinationAddress(account)}
-            className="w-fit rounded-full"
+            className="w-fit rounded-full text-primary hover:bg-primary-50"
           >
-            Use my wallet
+            Use my connected wallet
           </Button>
+        </div>
+
+        {/* Info Box */}
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-2xl p-4 mt-2">
+          <div className="flex gap-3">
+            <div className="text-blue-600 text-xl">ℹ️</div>
+            <div>
+              <p className="text-sm text-blue-900 font-medium mb-1">How it works</p>
+              <p className="text-xs text-blue-800 leading-relaxed">
+                Funds will be transferred from the treasury wallet to your specified address. 
+                The transaction will be processed on the Aptos blockchain and may take a few moments.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Withdraw Button */}
         <Button
           onClick={handleWithdraw}
           isLoading={isLoading}
-          isDisabled={!amount || !destinationAddress || parseFloat(amount) > balance}
-          className="h-16 mt-8 bg-primary w-full rounded-[42px] font-bold text-white"
+          isDisabled={!amount || !destinationAddress || parseFloat(amount) > balance || parseFloat(amount) <= 0 || isLoadingBalance}
+          className="h-16 mt-4 bg-primary hover:bg-primary-600 w-full rounded-2xl font-bold text-white text-lg shadow-lg transition-all disabled:opacity-50"
         >
-          {isLoading ? "Processing..." : "Withdraw Funds"}
+          {isLoading ? "Processing Withdrawal..." : "Withdraw Funds"}
         </Button>
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mt-4">
-          <p className="text-xs text-yellow-800">
-            <strong>Note:</strong> Funds will be sent from the treasury wallet to your specified address. 
-            This may take a few moments to process.
-          </p>
-        </div>
       </div>
     </div>
   );

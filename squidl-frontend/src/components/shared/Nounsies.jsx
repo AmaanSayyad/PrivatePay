@@ -59,6 +59,8 @@ export default function Nounsies({ address }) {
         backgroundColor: backgroundColor,
         width: "100%",
         height: "100%",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       {/* Loading indicator */}
@@ -71,7 +73,7 @@ export default function Nounsies({ address }) {
         <img
           src={body}
           alt="body"
-          style={{ position: "absolute", top: 0, left: 0, width: "100%" }}
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
           onLoad={handleImageLoad}
         />
       )}
@@ -79,7 +81,7 @@ export default function Nounsies({ address }) {
         <img
           src={head}
           alt="head"
-          style={{ position: "absolute", top: 0, left: 0, width: "100%" }}
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
           onLoad={handleImageLoad}
         />
       )}
@@ -87,7 +89,7 @@ export default function Nounsies({ address }) {
         <img
           src={accessory}
           alt="accessory"
-          style={{ position: "absolute", top: 0, left: 0, width: "100%" }}
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
           onLoad={handleImageLoad}
         />
       )}
@@ -95,7 +97,7 @@ export default function Nounsies({ address }) {
         <img
           src={glassesItem}
           alt="glasses"
-          style={{ position: "absolute", top: 0, left: 0, width: "100%" }}
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
           onLoad={handleImageLoad}
         />
       )}

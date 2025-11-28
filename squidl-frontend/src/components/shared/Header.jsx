@@ -87,11 +87,11 @@ const UserProfileButton = () => {
           <div className="absolute right-0 top-14 z-50 bg-white rounded-2xl shadow-lg border border-neutral-200 p-4 min-w-[280px]">
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3 pb-3 border-b border-neutral-200">
-                <div className="size-10 rounded-full overflow-hidden border-2 border-primary">
+                <div className="size-10 rounded-full overflow-hidden border-2 border-primary flex-shrink-0">
                   <Nounsies address={account || ""} />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 truncate">
                     {account?.slice(0, 6)}...{account?.slice(-4)}
                   </p>
                   <p className="text-xs text-gray-500">Aptos Wallet</p>
