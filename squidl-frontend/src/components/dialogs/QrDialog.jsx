@@ -1,7 +1,6 @@
 import { Button, Modal, ModalContent } from "@nextui-org/react";
 import { Icons } from "../shared/Icons.jsx";
 import toast from "react-hot-toast";
-import Chains from "../shared/Chains.jsx";
 import { QRCode } from "react-qrcode-logo";
 import { useRef, useState, useEffect } from "react";
 import { useAptos } from "../../providers/AptosProvider.jsx";
@@ -109,7 +108,12 @@ export default function QrDialog({ open, setOpen, qrUrl }) {
           </div>
         </div>
 
-        <Chains />
+        <div className="flex flex-col items-center gap-2 py-2">
+          <p className="text-sm text-gray-500">Supported Network</p>
+          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full">
+            <span className="text-base font-medium text-gray-800">Aptos</span>
+          </div>
+        </div>
 
         <div className="flex w-full items-center gap-4 mt-2">
           <Button
