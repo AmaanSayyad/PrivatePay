@@ -43,9 +43,22 @@ export function getPhotonUser() {
       return null;
     }
 
+    // Validate that the data is valid JSON before parsing
+    if (typeof userData !== 'string' || !userData.trim().startsWith('{')) {
+      console.warn('Invalid Photon user data in localStorage, clearing...');
+      clearPhotonUser();
+      return null;
+    }
+
     return JSON.parse(userData);
   } catch (error) {
     console.error('Failed to retrieve Photon user from localStorage:', error);
+    // Clear corrupted data
+    try {
+      localStorage.removeItem(PHOTON_USER_KEY);
+    } catch (clearError) {
+      console.error('Failed to clear corrupted Photon user data:', clearError);
+    }
     return null;
   }
 }

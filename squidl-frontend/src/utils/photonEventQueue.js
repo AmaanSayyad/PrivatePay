@@ -33,9 +33,23 @@ export function getQueuedEvents() {
     if (!queueData) {
       return [];
     }
+
+    // Validate that the data is valid JSON before parsing
+    if (typeof queueData !== 'string' || !queueData.trim().startsWith('[')) {
+      console.warn('Invalid event queue data in localStorage, clearing...');
+      clearEventQueue();
+      return [];
+    }
+
     return JSON.parse(queueData);
   } catch (error) {
     console.error('Failed to retrieve event queue:', error);
+    // Clear corrupted data
+    try {
+      localStorage.removeItem(EVENT_QUEUE_KEY);
+    } catch (clearError) {
+      console.error('Failed to clear corrupted event queue data:', clearError);
+    }
     return [];
   }
 }

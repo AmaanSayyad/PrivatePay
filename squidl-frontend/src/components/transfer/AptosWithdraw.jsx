@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { Icons } from "../shared/Icons";
 import { useNavigate } from "react-router-dom";
 import { usePhoton } from "../../providers/PhotonProvider.jsx";
+import SuccessDialog from "../dialogs/SuccessDialog.jsx";
 
 export function AptosWithdraw() {
   const { account, isConnected, connect } = useAptos();
@@ -17,6 +18,8 @@ export function AptosWithdraw() {
   const [destinationAddress, setDestinationAddress] = useState("");
   const [balance, setBalance] = useState(0);
   const [username, setUsername] = useState("");
+  const [openSuccess, setOpenSuccess] = useState(false);
+  const [successData, setSuccessData] = useState(null);
 
   useEffect(() => {
     async function loadBalance() {
@@ -158,16 +161,28 @@ export function AptosWithdraw() {
         tokenSymbol: "APT",
         destinationAddress: destinationAddress.slice(0, 10),
         txHash: committedTxn.hash.slice(0, 10),
-      });
+      }, account);
+
+      // Show success dialog with spy video
+      const successDataObj = {
+        type: "PRIVATE_TRANSFER",
+        amount: parseFloat(amount),
+        chain: { name: "Aptos", id: "aptos" },
+        token: { 
+          nativeToken: { 
+            symbol: "APT", 
+            logo: "/assets/aptos-logo.png" 
+          } 
+        },
+        destinationAddress: destinationAddress,
+        txHashes: [committedTxn.hash],
+      };
+      setSuccessData(successDataObj);
+      setOpenSuccess(true);
 
       // Reset form
       setAmount("");
       setDestinationAddress("");
-
-      // Navigate back after 2 seconds
-      setTimeout(() => {
-        navigate("/");
-      }, 2000);
     } catch (error) {
       console.error("Withdrawal error:", error);
       toast.dismiss("withdraw");
@@ -206,6 +221,17 @@ export function AptosWithdraw() {
   }
 
   return (
+    <>
+      <SuccessDialog
+        open={openSuccess}
+        setOpen={setOpenSuccess}
+        botButtonHandler={() => {
+          setOpenSuccess(false);
+          navigate("/");
+        }}
+        botButtonTitle={"Done"}
+        successData={successData}
+      />
     <div className="relative flex flex-col w-full max-w-md items-start justify-center bg-neutral-50 rounded-[32px] p-6">
       {/* Header */}
       <div className="relative flex gap-4 w-full items-center justify-center mb-8">
@@ -318,5 +344,6 @@ export function AptosWithdraw() {
         </Button>
       </div>
     </div>
+    </>
   );
 }

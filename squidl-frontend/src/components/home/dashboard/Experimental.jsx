@@ -115,7 +115,22 @@ export default function Experimental() {
 
       console.log("Withdraw queue:", withdrawQueue);
 
-      const authSigner = JSON.parse(localStorage.getItem("auth_signer"));
+      let authSigner;
+      try {
+        const authSignerData = localStorage.getItem("auth_signer");
+        if (!authSignerData) {
+          return toast.error("Signer not available");
+        }
+        // Validate JSON before parsing
+        if (typeof authSignerData !== 'string' || !authSignerData.trim().startsWith('{')) {
+          console.error("Invalid auth_signer data in localStorage");
+          return toast.error("Invalid signer data. Please reconnect your wallet.");
+        }
+        authSigner = JSON.parse(authSignerData);
+      } catch (error) {
+        console.error("Failed to parse auth_signer:", error);
+        return toast.error("Failed to load signer. Please reconnect your wallet.");
+      }
       if (!authSigner) {
         return toast.error("Signer not available");
       }
@@ -306,7 +321,22 @@ export default function Experimental() {
         throw new Error("Insufficient balance to complete withdrawal.");
       }
 
-      const authSigner = JSON.parse(localStorage.getItem("auth_signer"));
+      let authSigner;
+      try {
+        const authSignerData = localStorage.getItem("auth_signer");
+        if (!authSignerData) {
+          return toast.error("Signer not available");
+        }
+        // Validate JSON before parsing
+        if (typeof authSignerData !== 'string' || !authSignerData.trim().startsWith('{')) {
+          console.error("Invalid auth_signer data in localStorage");
+          return toast.error("Invalid signer data. Please reconnect your wallet.");
+        }
+        authSigner = JSON.parse(authSignerData);
+      } catch (error) {
+        console.error("Failed to parse auth_signer:", error);
+        return toast.error("Failed to load signer. Please reconnect your wallet.");
+      }
       if (!authSigner) {
         return toast.error("Signer not available");
       }

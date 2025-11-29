@@ -5,6 +5,7 @@ import { sendAptosStealthPayment, getAptosClient, getAptosMetaAddressFromChain }
 import { generateStealthAddress, generateEphemeralKeyPair, validatePublicKey, hexToBytes } from "../../lib/aptos/stealthAddress";
 import toast from "react-hot-toast";
 import { usePhoton } from "../../providers/PhotonProvider.jsx";
+import SuccessDialog from "../dialogs/SuccessDialog.jsx";
 
 /**
  * Aptos Send Stealth Payment Component
@@ -21,6 +22,8 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
   const [recipientSpendPubKey, setRecipientSpendPubKey] = useState("");
   const [recipientViewingPubKey, setRecipientViewingPubKey] = useState("");
   const [showGenerateForm, setShowGenerateForm] = useState(false);
+  const [openSuccess, setOpenSuccess] = useState(false);
+  const [successData, setSuccessData] = useState(null);
 
 
   const handleGenerateStealthAddress = async () => {
@@ -29,33 +32,62 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
       return;
     }
 
+    // Trim and validate input
+    const spendKey = recipientSpendPubKey.trim();
+    const viewingKey = recipientViewingPubKey.trim();
+
+    if (!spendKey || !viewingKey) {
+      toast.error("Please provide both spend and viewing public keys");
+      return;
+    }
+
     // Validate public keys
-    const spendValidation = validatePublicKey(recipientSpendPubKey);
-    const viewingValidation = validatePublicKey(recipientViewingPubKey);
+    const spendValidation = validatePublicKey(spendKey);
+    const viewingValidation = validatePublicKey(viewingKey);
 
     if (!spendValidation.valid) {
       toast.error(`Invalid spend public key: ${spendValidation.error}`);
+      console.error("Spend key validation failed:", spendKey, spendValidation);
       return;
     }
 
     if (!viewingValidation.valid) {
       toast.error(`Invalid viewing public key: ${viewingValidation.error}`);
+      console.error("Viewing key validation failed:", viewingKey, viewingValidation);
       return;
     }
 
     setIsGenerating(true);
     try {
+      console.log("Generating ephemeral key pair...");
       // Generate ephemeral key pair
       const ephemeralKeyPair = generateEphemeralKeyPair();
+      console.log("Ephemeral key pair generated:", {
+        privateKey: ephemeralKeyPair.privateKey.substring(0, 20) + "...",
+        publicKey: ephemeralKeyPair.publicKey.substring(0, 20) + "..."
+      });
+
       const ephemeralPrivKey = hexToBytes(ephemeralKeyPair.privateKey);
+      console.log("Ephemeral private key converted to bytes:", ephemeralPrivKey.length, "bytes");
+
+      console.log("Generating stealth address with:", {
+        spendPubKey: spendKey.substring(0, 20) + "...",
+        viewingPubKey: viewingKey.substring(0, 20) + "...",
+        ephemeralPrivKeyLength: ephemeralPrivKey.length
+      });
 
       // Generate stealth address
       const result = generateStealthAddress(
-        recipientSpendPubKey,
-        recipientViewingPubKey,
+        spendKey,
+        viewingKey,
         ephemeralPrivKey,
         0 // k = 0
       );
+
+      console.log("Stealth address generated successfully:", {
+        stealthAddress: result.stealthAddress,
+        ephemeralPubKey: result.ephemeralPubKey.substring(0, 20) + "..."
+      });
 
       setStealthAddress(result.stealthAddress);
       setEphemeralPubKey(result.ephemeralPubKey);
@@ -65,14 +97,25 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
         duration: 5000,
       });
     } catch (error) {
-      toast.error("Failed to generate stealth address");
-      console.error(error);
+      console.error("Error generating stealth address:", error);
+      const errorMessage = error?.message || "Unknown error occurred";
+      toast.error(`Failed to generate stealth address: ${errorMessage}`, {
+        duration: 8000,
+      });
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleSendPayment = async () => {
+    console.log("handleSendPayment called", {
+      stealthAddress,
+      ephemeralPubKey,
+      amount,
+      isConnected,
+      account
+    });
+
     if (!stealthAddress || !ephemeralPubKey || !amount) {
       toast.error("Please fill all fields");
       return;
@@ -140,7 +183,24 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
         recipientAddress: recipientAddress?.slice(0, 10) || "self",
         stealthAddress: stealthAddress.slice(0, 10),
         txHash: txHash.slice(0, 10),
-      });
+      }, account);
+
+      // Show success dialog with spy video
+      const successDataObj = {
+        type: "PRIVATE_TRANSFER",
+        amount: parseFloat(amount),
+        chain: { name: "Aptos", id: "aptos" },
+        token: { 
+          nativeToken: { 
+            symbol: "APT", 
+            logo: "/assets/aptos-logo.png" 
+          } 
+        },
+        destinationAddress: stealthAddress,
+        txHashes: [txHash],
+      };
+      setSuccessData(successDataObj);
+      setOpenSuccess(true);
 
       // Reset form
       setAmount("");
@@ -163,6 +223,16 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
   }
 
   return (
+    <>
+      <SuccessDialog
+        open={openSuccess}
+        setOpen={setOpenSuccess}
+        botButtonHandler={() => {
+          setOpenSuccess(false);
+        }}
+        botButtonTitle={"Done"}
+        successData={successData}
+      />
     <div className="flex flex-col gap-4 w-full">
 
       <div className="flex flex-col gap-4">
@@ -239,9 +309,18 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
                 <div className="flex gap-2">
                   <Button
                     color="primary"
-                    onClick={handleGenerateStealthAddress}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log("Generate button clicked!", {
+                        spendKey: recipientSpendPubKey,
+                        viewingKey: recipientViewingPubKey,
+                        isGenerating
+                      });
+                      handleGenerateStealthAddress();
+                    }}
                     isLoading={isGenerating}
-                    disabled={!recipientSpendPubKey || !recipientViewingPubKey}
+                    disabled={!recipientSpendPubKey || !recipientViewingPubKey || isGenerating}
                     className="flex-1 h-14 rounded-full"
                     size="lg"
                   >
@@ -310,9 +389,21 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
 
         <Button
           color="primary"
-          onClick={handleSendPayment}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("Send Stealth Payment button clicked!", {
+              stealthAddress,
+              ephemeralPubKey,
+              amount,
+              isLoading,
+              isConnected,
+              account
+            });
+            handleSendPayment();
+          }}
           isLoading={isLoading}
-          disabled={!stealthAddress || !ephemeralPubKey || !amount}
+          disabled={!stealthAddress || !ephemeralPubKey || !amount || isLoading}
           className="w-full h-14 rounded-full"
           size="lg"
         >
@@ -320,6 +411,7 @@ export default function AptosSendPayment({ recipientAddress, recipientMetaIndex 
         </Button>
       </div>
     </div>
+    </>
   );
 }
 

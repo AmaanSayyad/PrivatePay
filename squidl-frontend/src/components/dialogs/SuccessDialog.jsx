@@ -135,19 +135,7 @@ export default function SuccessDialog({
                     on {successData.chain.name}
                   </div>
                 </div>
-
-                {successData.type === "PRIVATE_TRANSFER" &&
-                  <p className="text-xs opacity-60 mt-4">
-                    Bridged through Celer, the process may take up to 20 minutes.
-                  </p>
-                }
               </div>
-
-              {successData.type === "PRIVATE_TRANSFER" &&
-                <p className="text-xs text-center opacity-60">
-                  Your token is now private, secured with iluminneX{"'"}s private wrapped token. Enjoy unmatched privacy without any ties back to you.
-                </p>
-              }
 
               <div className="flex flex-col gap-2 w-full">
                 {topButtonHandler && (

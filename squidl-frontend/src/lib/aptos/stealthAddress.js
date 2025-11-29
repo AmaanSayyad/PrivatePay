@@ -45,10 +45,16 @@ export const publicKeyToHex = (publicKey) => {
  * Convert hex string to bytes
  */
 const hexToBytes = (hex) => {
+  if (!hex || typeof hex !== 'string') {
+    throw new Error('Invalid hex string');
+  }
   const cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (cleanHex.length % 2 !== 0) {
+    throw new Error('Hex string must have even length');
+  }
   const bytes = new Uint8Array(cleanHex.length / 2);
   for (let i = 0; i < cleanHex.length; i += 2) {
-    bytes[i / 2] = parseInt(cleanHex.substr(i, 2), 16);
+    bytes[i / 2] = parseInt(cleanHex.substring(i, i + 2), 16);
   }
   return bytes;
 };
@@ -226,16 +232,30 @@ export const generateMetaAddressKeys = () => {
  */
 export const validatePublicKey = (pubKeyHex) => {
   try {
+    if (!pubKeyHex || typeof pubKeyHex !== 'string') {
+      return { valid: false, error: "Public key must be a string" };
+    }
+
+    // Clean the hex string
+    const cleanHex = pubKeyHex.trim().startsWith("0x") ? pubKeyHex.trim().slice(2) : pubKeyHex.trim();
+    
+    if (cleanHex.length !== 66) { // 33 bytes = 66 hex characters
+      return { 
+        valid: false, 
+        error: `Public key must be 33 bytes (66 hex characters), got ${cleanHex.length / 2} bytes` 
+      };
+    }
+
     const bytes = hexToBytes(pubKeyHex);
     if (bytes.length !== 33) {
-      return { valid: false, error: "Public key must be 33 bytes (compressed)" };
+      return { valid: false, error: `Public key must be 33 bytes, got ${bytes.length} bytes` };
     }
     if (bytes[0] !== 0x02 && bytes[0] !== 0x03) {
-      return { valid: false, error: "Invalid compression flag" };
+      return { valid: false, error: `Invalid compression flag (must be 0x02 or 0x03), got 0x${bytes[0].toString(16).padStart(2, '0')}` };
     }
     return { valid: true };
   } catch (error) {
-    return { valid: false, error: error.message };
+    return { valid: false, error: error.message || "Invalid public key format" };
   }
 };
 

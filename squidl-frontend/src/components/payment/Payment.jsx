@@ -1,82 +1,203 @@
-import { useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
-import { Button, Spinner } from "@nextui-org/react";
-import { useState } from "react";
+import { Button, Input, Spinner } from "@nextui-org/react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { QRCode } from "react-qrcode-logo";
 import { useLoaderData, useParams } from "react-router-dom";
-import useSWR from "swr";
-import { squidlPublicAPI } from "../../api/squidl.js";
-import { shortenAddress } from "../../utils/string.js";
-import OnRampDialog from "../dialogs/OnrampDialog.jsx";
-import SuccessDialog from "../dialogs/SuccessDialog.jsx";
-import Chains from "../shared/Chains.jsx";
-import { Icons } from "../shared/Icons.jsx";
+import { useAptos } from "../../providers/AptosProvider.jsx";
+import { getPaymentLinkByAlias, getUserByUsername, recordPayment } from "../../lib/supabase.js";
+import { sendAptTransfer } from "../../lib/aptos.js";
 import { usePhoton } from "../../providers/PhotonProvider.jsx";
+import SuccessDialog from "../dialogs/SuccessDialog.jsx";
+import { Icons } from "../shared/Icons.jsx";
+
+const TREASURY_WALLET = import.meta.env.VITE_TREASURY_WALLET_ADDRESS;
 
 export default function Payment() {
-  const isLoggedIn = useIsLoggedIn();
   const loaderData = useLoaderData();
-  const { trackUnrewardedEvent } = usePhoton();
-
-  const [openOnramp, setOpenOnramp] = useState(false);
-  const [openSuccess, setOpenSuccess] = useState(false);
-  const { setShowAuthFlow } = useDynamicContext();
   const { alias_url } = useParams();
+  const { account, isConnected, connect } = useAptos();
+  const { trackRewardedEvent, trackUnrewardedEvent } = usePhoton();
 
   const alias = loaderData ? loaderData.subdomain : alias_url;
 
-  console.log({ alias, loaderData });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [paymentLinkData, setPaymentLinkData] = useState(null);
+  const [recipientData, setRecipientData] = useState(null);
+  const [amount, setAmount] = useState("");
+  const [openSuccess, setOpenSuccess] = useState(false);
+  const [successData, setSuccessData] = useState(null);
+  const [error, setError] = useState(null);
 
-  const [isAliasDataError, setAliasDataError] = useState(false);
+  // Fetch payment link data from Supabase
+  useEffect(() => {
+    async function fetchPaymentLink() {
+      if (!alias) {
+        setError("No payment link alias provided");
+        setIsLoading(false);
+        return;
+      }
 
-  const { data: aliasData, isLoading: isLoadingAliasData } = useSWR(
-    alias ? `/stealth-address/aliases/${alias}/detail` : null,
-    async (url) => {
+      setIsLoading(true);
+      setError(null);
+
       try {
-        const { data } = await squidlPublicAPI.get(url);
-        console.log("aliasData", data);
+        // First, try to get payment link by alias
+        const paymentLink = await getPaymentLinkByAlias(alias);
         
-        // Track unrewarded event for payment page view
-        if (data) {
+        if (paymentLink) {
+          setPaymentLinkData(paymentLink);
+          
+          // Get recipient user data
+          const recipient = await getUserByUsername(paymentLink.username);
+          setRecipientData(recipient);
+          
+          // Track unrewarded event for payment page view
           trackUnrewardedEvent("payment_page_viewed", {
             alias: alias,
-            recipientUsername: data.user?.username,
+            recipientUsername: paymentLink.username,
           });
+        } else {
+          // If not found as payment link, try as username
+          const recipient = await getUserByUsername(alias);
+          if (recipient) {
+            setRecipientData(recipient);
+            trackUnrewardedEvent("payment_page_viewed", {
+              alias: alias,
+              recipientUsername: alias,
+            });
+          } else {
+            setError("Payment link not found. Please check the URL and try again.");
+          }
         }
-        
-        return data;
       } catch (error) {
-        console.error("Error fetching alias data", error);
-        setAliasDataError(true);
-        return null;
+        console.error("Error fetching payment link:", error);
+        setError("Failed to load payment link. Please try again.");
+      } finally {
+        setIsLoading(false);
       }
     }
-  );
+
+    fetchPaymentLink();
+  }, [alias, trackUnrewardedEvent]);
+
+  const handleConnectWallet = async () => {
+    try {
+      await connect();
+      toast.success("Wallet connected successfully!");
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      toast.error(error.message || "Failed to connect wallet");
+    }
+  };
+
+  const handleSendPayment = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    if (!isConnected || !account) {
+      toast.error("Please connect your Aptos wallet first");
+      return;
+    }
+
+    if (!TREASURY_WALLET) {
+      toast.error("Treasury wallet not configured");
+      return;
+    }
+
+    const recipientUsername = paymentLinkData?.username || alias;
+    
+    if (!recipientUsername) {
+      toast.error("Recipient not found");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      // Send APT to treasury wallet
+      const result = await sendAptTransfer({
+        accountAddress: account,
+        recipientAddress: TREASURY_WALLET,
+        amount: parseFloat(amount),
+        isTestnet: true,
+      });
+
+      if (!result.success) {
+        throw new Error("Transaction failed");
+      }
+
+      // Record payment in Supabase
+      await recordPayment(
+        account,
+        recipientUsername,
+        parseFloat(amount),
+        result.hash
+      );
+
+      // Trigger balance update event
+      window.dispatchEvent(new Event('balance-updated'));
+
+      const shortHash = result.hash.slice(0, 6) + "..." + result.hash.slice(-4);
+      
+      toast.success(
+        (t) => (
+          <div 
+            onClick={() => {
+              window.open(result.explorerUrl, '_blank');
+              toast.dismiss(t.id);
+            }}
+            className="cursor-pointer hover:underline"
+          >
+            Payment sent to {alias}.privatepay.me! TX: {shortHash} (click to view)
+          </div>
+        ),
+        { duration: 8000 }
+      );
+
+      // Track rewarded event for successful payment
+      trackRewardedEvent("aptos_payment_link_payment_sent", {
+        amount: parseFloat(amount),
+        tokenSymbol: "APT",
+        recipientUsername: recipientUsername,
+        alias: alias,
+        txHash: result.hash.slice(0, 10),
+      }, account);
+
+      // Show success dialog
+      const successDataObj = {
+        type: "PRIVATE_TRANSFER",
+        amount: parseFloat(amount),
+        chain: { name: "Aptos", id: "aptos" },
+        token: { 
+          nativeToken: { 
+            symbol: "APT", 
+            logo: "/assets/aptos-logo.png" 
+          } 
+        },
+        destinationAddress: `${alias}.privatepay.me`,
+        txHashes: [result.hash],
+      };
+      setSuccessData(successDataObj);
+      setOpenSuccess(true);
+
+      // Reset form
+      setAmount("");
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast.error(error.message || "Failed to send payment");
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const onCopy = (text) => {
+    navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard", {
       id: "copy",
       duration: 1000,
       position: "bottom-center",
     });
-    navigator.clipboard.writeText(text);
-  };
-
-  const sendTx = async () => {
-    toast.loading("Processing transaction...", {
-      id: "send",
-      position: "bottom-center",
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    toast.success("Transaction completed successfully!", {
-      id: "send",
-      duration: 1000,
-      position: "bottom-center",
-    });
-
-    setOpenSuccess(true);
   };
 
   return (
@@ -88,24 +209,10 @@ export default function Payment() {
           setOpenSuccess(false);
         }}
         botButtonTitle={"Done"}
-        title={"Transaction Successful"}
-        caption={"Your transaction has been submitted successfully."}
+        successData={successData}
       />
 
-      <OnRampDialog
-        open={openOnramp}
-        setOpen={setOpenOnramp}
-        targetWallet={"0x02919065a8Ef7A782Bb3D9f3DEFef2FA0a4d1f37"}
-        onSuccessOnramp={() => {
-          sendTx();
-        }}
-      />
-
-      <div
-        className={
-          "flex flex-col w-full max-w-md h-full max-h-screen items-center justify-center gap-5"
-        }
-      >
+      <div className="flex flex-col w-full max-w-md h-full max-h-screen items-center justify-center gap-5">
         <div className="w-36">
           <img
             src="/assets/squidl-only.svg"
@@ -117,91 +224,101 @@ export default function Payment() {
         {/* Content Rendering */}
         <div className="w-full h-full flex items-center justify-center">
           {/* Loading State */}
-          {isLoadingAliasData && (
+          {isLoading && (
             <div className="my-10 flex flex-col items-center">
-              <Spinner color="primary" />
-              <div className="mt-5 animate-pulse">Fetching the address...</div>
+              <Spinner color="primary" size="lg" />
+              <div className="mt-5 animate-pulse text-gray-600">Loading payment link...</div>
             </div>
           )}
 
           {/* Error State */}
-          {isAliasDataError && (
-            <div className="text-center max-w-[16rem]">
-              Failed to fetch the info, make sure to check the link and try
-              again.
+          {!isLoading && error && (
+            <div className="text-center max-w-[20rem] bg-red-50 border border-red-200 rounded-2xl p-6">
+              <p className="text-red-800 font-medium">{error}</p>
+              <p className="text-red-600 text-sm mt-2">Please check the link and try again.</p>
             </div>
           )}
 
-          {/* Success State */}
-          {!isLoadingAliasData && aliasData && !isAliasDataError && (
-            <div className="bg-light-white rounded-[32px] py-9 px-10 md:px-20 flex flex-col items-center justify-center w-full h-full">
-              <h1 className="font-medium text-xl">
+          {/* Success State - Payment Form */}
+          {!isLoading && !error && (paymentLinkData || recipientData) && (
+            <div className="bg-white rounded-[32px] py-9 px-10 md:px-20 flex flex-col items-center justify-center w-full border border-gray-200 shadow-lg">
+              <h1 className="font-medium text-xl mb-2 text-center">
                 Send to{" "}
                 <span className="font-semibold text-primary">
-                  {aliasData.user.username}
+                  {paymentLinkData?.username || alias}
                 </span>
               </h1>
+              
+              <p className="text-sm text-gray-500 mb-6">
+                {alias}.privatepay.me
+              </p>
 
-              <Chains />
+              {/* Wallet Connection */}
+              {!isConnected ? (
+                <div className="w-full flex flex-col gap-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                    <p className="text-sm text-blue-800 text-center">
+                      Connect your Aptos wallet (Petra) to send a payment
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleConnectWallet}
+                    className="bg-primary text-white font-bold py-5 px-6 h-16 w-full rounded-[32px]"
+                    size="lg"
+                  >
+                    Connect Aptos Wallet
+                  </Button>
+                </div>
+              ) : (
+                <div className="w-full flex flex-col gap-4">
+                  {/* Connected Wallet Info */}
+                  <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-800 font-medium">Wallet Connected</p>
+                        <p className="text-xs text-green-600 mt-1">
+                          {account?.slice(0, 6)}...{account?.slice(-4)}
+                        </p>
+                      </div>
+                      <svg className="text-green-600 w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
 
-              <div className="bg-primary rounded-3xl mt-7 p-5 flex flex-col items-center justify-center gap-4 w-full">
-                <div className="w-full bg-white overflow-hidden p-1 rounded-xl">
-                  <QRCode
-                    value={aliasData.stealthAddress.address}
-                    qrStyle="dots"
-                    logoImage="/assets/nouns.png"
-                    logoHeight={30}
-                    logoWidth={30}
-                    style={{
-                      width: "100%",
-                      height: "100%",
+                  {/* Amount Input */}
+                  <Input
+                    label="Amount (APT)"
+                    type="number"
+                    placeholder="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    description="Enter the amount you want to send"
+                    classNames={{
+                      input: "text-lg",
+                      inputWrapper: "h-14",
                     }}
+                    min="0"
+                    step="0.00000001"
                   />
-                </div>
 
-                <div className="flex flex-row items-center gap-2.5">
-                  <h1 className="font-medium text-lg text-[#F4F4F4]">
-                    {aliasData.stealthAddress.ens}
-                  </h1>
-                  <button onClick={() => onCopy(aliasData.stealthAddress.ens)}>
-                    <Icons.copy className="text-primary-200" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-col gap-4 mt-4 items-center justify-center w-full">
-                <div className="flex bg-white rounded-[30.5px] gap-4 w-full items-center justify-between">
-                  <h1 className="text-[#19191B] font-medium px-4 py-3">
-                    {shortenAddress(aliasData.stealthAddress.address)}
-                  </h1>
-                  <button
-                    onClick={() => onCopy(aliasData.stealthAddress.address)}
-                    className="flex p-3 bg-light rounded-full m-1"
-                  >
-                    <Icons.copy className="text-primary size-6" />
-                  </button>
-                </div>
-
-                <p className="text-[#A1A1A3]">or</p>
-
-                {/* OnRamp */}
-                {isLoggedIn ? (
+                  {/* Send Button */}
                   <Button
-                    onClick={() => setOpenOnramp(true)}
-                    className="bg-primary text-[#F4F4F4] font-bold py-5 px-6 h-16 w-full rounded-[32px]"
+                    onClick={handleSendPayment}
+                    isLoading={isSending}
+                    disabled={!amount || parseFloat(amount) <= 0}
+                    className="bg-primary text-white font-bold py-5 px-6 h-16 w-full rounded-[32px]"
+                    size="lg"
                   >
-                    Pay with Credit Card
+                    {isSending ? "Sending..." : `Send ${amount || "0"} APT`}
                   </Button>
-                ) : (
-                  <Button
-                    onClick={() => setShowAuthFlow(true)}
-                    className="bg-primary text-[#F4F4F4] font-bold py-5 px-6 h-16 w-full rounded-[32px]"
-                  >
-                    Log in to pay with a credit card
-                  </Button>
-                )}
-              </div>
+
+                  {/* Info */}
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Funds will be sent to the treasury wallet. The recipient can withdraw anytime.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

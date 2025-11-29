@@ -184,13 +184,19 @@ export const sendAptosStealthPayment = async ({
 };
 
 /**
- * Helper: Convert hex string to Uint8Array
+ * Helper: Convert hex string to Array (for Aptos Move vector<u8>)
  */
 export const hexToBytes = (hex) => {
+  if (!hex || typeof hex !== 'string') {
+    throw new Error('Invalid hex string');
+  }
   const cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
+  if (cleanHex.length % 2 !== 0) {
+    throw new Error('Hex string must have even length');
+  }
   const bytes = new Uint8Array(cleanHex.length / 2);
   for (let i = 0; i < cleanHex.length; i += 2) {
-    bytes[i / 2] = parseInt(cleanHex.substr(i, 2), 16);
+    bytes[i / 2] = parseInt(cleanHex.substring(i, i + 2), 16);
   }
   return Array.from(bytes);
 };

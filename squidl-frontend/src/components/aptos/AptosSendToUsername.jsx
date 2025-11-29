@@ -5,6 +5,7 @@ import { sendAptTransfer } from "../../lib/aptos";
 import { recordPayment, getUserByUsername, getPaymentLinkByAlias } from "../../lib/supabase";
 import toast from "react-hot-toast";
 import { usePhoton } from "../../providers/PhotonProvider.jsx";
+import SuccessDialog from "../dialogs/SuccessDialog.jsx";
 
 const TREASURY_WALLET = import.meta.env.VITE_TREASURY_WALLET_ADDRESS;
 
@@ -14,6 +15,8 @@ export default function AptosSendToUsername() {
   const [isLoading, setIsLoading] = useState(false);
   const [username, setUsername] = useState("");
   const [amount, setAmount] = useState("");
+  const [openSuccess, setOpenSuccess] = useState(false);
+  const [successData, setSuccessData] = useState(null);
 
   const handleSendPayment = async () => {
     if (!username || !amount) {
@@ -76,6 +79,9 @@ export default function AptosSendToUsername() {
         result.hash
       );
 
+      // Trigger balance update event so chart updates
+      window.dispatchEvent(new Event('balance-updated'));
+
       const shortHash = result.hash.slice(0, 6) + "..." + result.hash.slice(-4);
       
       toast.success(
@@ -100,7 +106,24 @@ export default function AptosSendToUsername() {
         recipientUsername: username,
         recipientActualUsername: recipientUsername,
         txHash: result.hash.slice(0, 10),
-      });
+      }, account);
+
+      // Show success dialog with spy video
+      const successDataObj = {
+        type: "PRIVATE_TRANSFER",
+        amount: parseFloat(amount),
+        chain: { name: "Aptos", id: "aptos" },
+        token: { 
+          nativeToken: { 
+            symbol: "APT", 
+            logo: "/assets/aptos-logo.png" 
+          } 
+        },
+        destinationAddress: `${username}.privatepay.me`,
+        txHashes: [result.hash],
+      };
+      setSuccessData(successDataObj);
+      setOpenSuccess(true);
 
       // Reset form
       setUsername("");
@@ -122,6 +145,16 @@ export default function AptosSendToUsername() {
   }
 
   return (
+    <>
+      <SuccessDialog
+        open={openSuccess}
+        setOpen={setOpenSuccess}
+        botButtonHandler={() => {
+          setOpenSuccess(false);
+        }}
+        botButtonTitle={"Done"}
+        successData={successData}
+      />
     <div className="flex flex-col gap-4 w-full">
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
         <p className="text-sm text-blue-800">
@@ -168,5 +201,6 @@ export default function AptosSendToUsername() {
         Send to {username || "username"}.privatepay.me
       </Button>
     </div>
+    </>
   );
 }

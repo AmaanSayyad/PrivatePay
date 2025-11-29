@@ -122,8 +122,25 @@ function StepOne({ setStep }) {
         }
       );
 
-      const authSigner = JSON.parse(localStorage.getItem("auth_signer"));
-      if (!authSigner) throw new Error("Auth signer not found in localStorage");
+      let authSigner;
+      try {
+        const authSignerData = localStorage.getItem("auth_signer");
+        if (!authSignerData) {
+          throw new Error("Auth signer not found in localStorage");
+        }
+        // Validate JSON before parsing
+        if (typeof authSignerData !== 'string' || !authSignerData.trim().startsWith('{')) {
+          console.error("Invalid auth_signer data in localStorage");
+          throw new Error("Invalid signer data. Please reconnect your wallet.");
+        }
+        authSigner = JSON.parse(authSignerData);
+      } catch (error) {
+        console.error("Failed to parse auth_signer:", error);
+        throw error;
+      }
+      if (!authSigner) {
+        throw new Error("Auth signer not found in localStorage");
+      }
 
       // Sapphire Provider and Paymaster Wallet
       const sapphireProvider = new ethers.JsonRpcProvider(sapphireTestnet.rpcUrls[0]);
