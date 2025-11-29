@@ -133,18 +133,49 @@ export async function getUserBalance(username) {
 }
 
 /**
- * Get user payments (received)
+ * Get user payments (received and sent)
  */
 export async function getUserPayments(username) {
   try {
-    const { data, error } = await supabase
+    // Get received payments
+    const { data: receivedPayments, error: receivedError } = await supabase
       .from('payments')
       .select('*')
       .eq('recipient_username', username)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+    if (receivedError) throw receivedError;
+
+    // Get sent payments (where user is the sender)
+    // We need to get the user's wallet address first
+    const { data: user } = await supabase
+      .from('users')
+      .select('wallet_address')
+      .eq('username', username)
+      .single();
+
+    let sentPayments = [];
+    if (user) {
+      const { data: sent, error: sentError } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('sender_address', user.wallet_address)
+        .order('created_at', { ascending: false });
+
+      if (!sentError && sent) {
+        // Mark sent payments with a flag
+        sentPayments = sent.map(payment => ({
+          ...payment,
+          is_sent: true
+        }));
+      }
+    }
+
+    // Combine and sort by date
+    const allPayments = [...(receivedPayments || []), ...sentPayments]
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    return allPayments;
   } catch (error) {
     console.error('Error getting payments:', error);
     return [];
