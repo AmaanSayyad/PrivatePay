@@ -61,7 +61,7 @@ export default function Dashboard() {
         className="w-full h-screen flex flex-col items-center overflow-y-auto"
       >
         <div className="flex flex-col items-center py-20 w-full">
-          <div className="w-full max-w-md flex flex-col items-center gap-4 pt-12 pb-20">
+          <div className="w-full max-w-lg flex flex-col items-center gap-4 pt-12 pb-20">
             <ReceiveCard setOpenQr={setOpenQr} />
             <BalanceCard balance={balance} isLoading={isLoadingBalance} />
             <PhotonWalletDisplay />

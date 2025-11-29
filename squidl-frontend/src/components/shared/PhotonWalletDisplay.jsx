@@ -61,7 +61,7 @@ function PhotonWalletDisplayInner() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-6 bg-white rounded-2xl border border-neutral-200">
+      <div className="flex items-center justify-center p-6 bg-white rounded-2xl border border-neutral-200 w-full max-w-lg">
         <Spinner size="md" color="primary" />
       </div>
     );
@@ -70,7 +70,7 @@ function PhotonWalletDisplayInner() {
   // Demo Mode Display
   if (isDemo) {
     return (
-      <div className="flex flex-col gap-4 p-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl border-2 border-dashed border-purple-300">
+      <div className="flex flex-col gap-4 p-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl border-2 border-dashed border-purple-300 w-full max-w-lg">
         {/* Header */}
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100">
@@ -150,7 +150,7 @@ function PhotonWalletDisplayInner() {
     };
 
     return (
-      <div className="flex flex-col items-center justify-center gap-4 p-6 bg-white rounded-2xl border border-neutral-200">
+      <div className="flex flex-col items-center justify-center gap-4 p-6 bg-white rounded-2xl border border-neutral-200 w-full max-w-lg">
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-50">
             <WalletIcon className="w-6 h-6 text-primary" />
@@ -174,7 +174,7 @@ function PhotonWalletDisplayInner() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-6 bg-white rounded-2xl border border-neutral-200">
+    <div className="flex flex-col gap-4 p-6 bg-white rounded-2xl border border-neutral-200 w-full max-w-lg">
       {/* Header */}
       <div className="flex items-center gap-2">
         <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary-50">
