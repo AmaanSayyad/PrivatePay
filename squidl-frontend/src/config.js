@@ -146,11 +146,17 @@ export const customEvmNetworks =
     : MAINNET_CHAINS;
 
 // Photon Configuration
+const hasValidApiKey = import.meta.env.VITE_PHOTON_API_KEY && 
+                       import.meta.env.VITE_PHOTON_API_KEY !== 'your_photon_api_key_here';
+const hasValidCampaignId = import.meta.env.VITE_PHOTON_CAMPAIGN_ID && 
+                           import.meta.env.VITE_PHOTON_CAMPAIGN_ID !== 'your_photon_campaign_id_here';
+
 export const PHOTON_CONFIG = {
   apiBaseUrl: "https://stage-api.getstan.app/identity-service/api/v1",
   apiKey: import.meta.env.VITE_PHOTON_API_KEY,
   campaignId: import.meta.env.VITE_PHOTON_CAMPAIGN_ID,
-  enabled: Boolean(import.meta.env.VITE_PHOTON_API_KEY && import.meta.env.VITE_PHOTON_CAMPAIGN_ID),
+  enabled: true, // Always enabled, will use demo mode if no valid API key
+  isDemo: !hasValidApiKey || !hasValidCampaignId, // Demo mode when API keys are missing
 };
 
 export const CHAINS = [

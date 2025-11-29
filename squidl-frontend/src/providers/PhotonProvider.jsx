@@ -17,6 +17,7 @@ const PhotonContext = createContext({
   walletAddress: null,
   isLoading: true,
   isEnabled: false,
+  isDemo: false,
   registerWithPhoton: async () => {},
   trackRewardedEvent: async () => {},
   trackUnrewardedEvent: async () => {},
@@ -33,9 +34,9 @@ export default function PhotonProvider({ children }) {
   // Session restoration with improved error handling
   useEffect(() => {
     const restoreSession = async () => {
-      // Graceful degradation: Check if Photon is configured
-      if (!PHOTON_CONFIG.enabled) {
-        console.warn('Photon is not configured. Missing API key or campaign ID. Photon features will be disabled.');
+      // Check if Photon is in demo mode
+      if (PHOTON_CONFIG.isDemo) {
+        console.info('🎭 Photon is running in DEMO mode. Add valid API keys to enable real functionality.');
         setIsLoading(false);
         return;
       }
@@ -272,6 +273,7 @@ export default function PhotonProvider({ children }) {
     walletAddress: photonUser?.walletAddress || null,
     isLoading,
     isEnabled: PHOTON_CONFIG.enabled,
+    isDemo: PHOTON_CONFIG.isDemo,
     registerWithPhoton,
     trackRewardedEvent,
     trackUnrewardedEvent,

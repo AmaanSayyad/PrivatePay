@@ -22,7 +22,7 @@ import toast from 'react-hot-toast';
 import PhotonErrorBoundary from './PhotonErrorBoundary';
 
 function PhotonWalletDisplayInner() {
-  const { photonUser, isAuthenticated, walletAddress, isLoading, isEnabled } = usePhoton();
+  const { photonUser, isAuthenticated, walletAddress, isLoading, isEnabled, isDemo } = usePhoton();
   const [copied, setCopied] = useState(false);
 
   // Graceful degradation: Don't render if Photon is not configured
@@ -53,6 +53,59 @@ function PhotonWalletDisplayInner() {
     return (
       <div className="flex items-center justify-center p-6 bg-white rounded-2xl border border-neutral-200">
         <Spinner size="md" color="primary" />
+      </div>
+    );
+  }
+
+  // Demo Mode Display
+  if (isDemo) {
+    return (
+      <div className="flex flex-col gap-4 p-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl border-2 border-dashed border-purple-300">
+        {/* Header */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100">
+            <WalletIcon className="w-5 h-5 text-purple-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-gray-800">Photon Wallet</h3>
+            <p className="text-xs text-purple-600 font-medium">🎭 DEMO MODE</p>
+          </div>
+        </div>
+
+        {/* Demo Info */}
+        <div className="flex flex-col gap-3 p-4 bg-white/80 rounded-lg">
+          <div className="flex items-start gap-2">
+            <span className="text-lg">💡</span>
+            <div className="flex-1">
+              <p className="text-xs font-medium text-gray-700 mb-1">Demo Mode Active</p>
+              <p className="text-xs text-gray-600">
+                Add your Photon API keys to .env file to enable real rewards and wallet functionality.
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex flex-col gap-2 pt-2 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-600">Demo Wallet:</span>
+              <span className="text-xs font-mono text-gray-800">0x1234...5678</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-600">Demo PAT Balance:</span>
+              <span className="text-xs font-semibold text-purple-600">100 PAT</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Setup Instructions */}
+        <div className="flex flex-col gap-1 p-3 bg-purple-100/50 rounded-lg">
+          <p className="text-xs font-medium text-purple-900">To enable real Photon:</p>
+          <ol className="text-xs text-purple-800 space-y-1 ml-4 list-decimal">
+            <li>Get API key from Photon dashboard</li>
+            <li>Add to .env: VITE_PHOTON_API_KEY</li>
+            <li>Add to .env: VITE_PHOTON_CAMPAIGN_ID</li>
+            <li>Restart dev server</li>
+          </ol>
+        </div>
       </div>
     );
   }

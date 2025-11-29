@@ -28,7 +28,7 @@ function PhotonOnboardingButtonInner({
   size = 'lg',
   fullWidth = false,
 }) {
-  const { registerWithPhoton, isAuthenticated, isEnabled } = usePhoton();
+  const { registerWithPhoton, isAuthenticated, isEnabled, isDemo } = usePhoton();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -40,6 +40,15 @@ function PhotonOnboardingButtonInner({
   const handleRegister = async () => {
     // Clear any previous errors
     setError(null);
+
+    // Demo mode handling
+    if (isDemo) {
+      toast('🎭 Demo Mode: Add Photon API keys to enable real registration', {
+        icon: '💡',
+        duration: 4000,
+      });
+      return;
+    }
 
     // Validate user data
     if (!userData || !userData.userId || !userData.email) {
@@ -97,13 +106,18 @@ function PhotonOnboardingButtonInner({
         onClick={handleRegister}
         isLoading={isLoading}
         isDisabled={isLoading}
-        className={`${fullWidth ? 'w-full' : ''} ${className}`}
+        className={`${fullWidth ? 'w-full' : ''} ${className} ${isDemo ? 'opacity-75' : ''}`}
         variant={variant}
-        color={color}
+        color={isDemo ? 'secondary' : color}
         size={size}
       >
-        {children}
+        {isDemo ? '🎭 ' : ''}{children}
       </Button>
+      {isDemo && (
+        <p className="text-xs text-center text-gray-500">
+          Demo mode - Add API keys to enable
+        </p>
+      )}
       
       {error && (
         <div className="text-sm text-red-600 px-2">
