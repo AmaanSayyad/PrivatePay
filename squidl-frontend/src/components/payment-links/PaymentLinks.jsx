@@ -5,7 +5,7 @@ import {
   AVAILABLE_CARDS_BG,
   CARDS_SCHEME,
 } from "../home/dashboard/PaymentLinksDashboard.jsx";
-import { Button } from "@nextui-org/react";
+import { Button, Spinner } from "@nextui-org/react";
 import { useAtom } from "jotai";
 import SquidLogo from "../../assets/squidl-logo.svg?react";
 import { isCreateLinkDialogAtom } from "../../store/dialog-store.js";
@@ -14,6 +14,7 @@ import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Icons } from "../shared/Icons.jsx";
 import { usePhoton } from "../../providers/PhotonProvider.jsx";
+import { getPaymentLinks } from "../../lib/supabase.js";
 
 export default function PaymentLinks() {
   const navigate = useNavigate();
@@ -22,14 +23,17 @@ export default function PaymentLinks() {
   const { trackUnrewardedEvent } = usePhoton();
   const [paymentLinks, setPaymentLinks] = useState([]);
   const [username, setUsername] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadPaymentLinks = () => {
+  const loadPaymentLinks = async () => {
     if (account) {
       const savedUsername = localStorage.getItem(`aptos_username_${account}`);
       setUsername(savedUsername || account.slice(2, 8));
 
-      const links = JSON.parse(localStorage.getItem(`aptos_payment_links_${account}`) || "[]");
+      // Load from Supabase instead of localStorage
+      const links = await getPaymentLinks(account);
       setPaymentLinks(links);
+      setIsLoading(false);
     }
   };
 
@@ -47,14 +51,19 @@ export default function PaymentLinks() {
     };
   }, [account]);
 
-  const handleDeleteLink = (aliasToDelete) => {
-    if (account) {
-      const links = JSON.parse(localStorage.getItem(`aptos_payment_links_${account}`) || "[]");
-      const updatedLinks = links.filter(link => link.alias !== aliasToDelete);
-      localStorage.setItem(`aptos_payment_links_${account}`, JSON.stringify(updatedLinks));
-      setPaymentLinks(updatedLinks);
+  const handleDeleteLink = async (linkId) => {
+    try {
+      const { deletePaymentLink } = await import("../../lib/supabase.js");
+      await deletePaymentLink(linkId);
+      
+      // Reload payment links
+      await loadPaymentLinks();
+      
       toast.success("Payment link deleted");
       window.dispatchEvent(new Event('payment-links-updated'));
+    } catch (error) {
+      console.error("Error deleting payment link:", error);
+      toast.error("Failed to delete payment link");
     }
   };
 
@@ -85,7 +94,11 @@ export default function PaymentLinks() {
       </div>
 
       <div className="w-full flex flex-col px-6">
-        {paymentLinks && paymentLinks.length > 0 ? (
+        {isLoading ? (
+          <div className="w-full min-h-64 flex items-center justify-center">
+            <Spinner size="lg" color="primary" />
+          </div>
+        ) : paymentLinks && paymentLinks.length > 0 ? (
           paymentLinks.map((link, idx) => {
             const bgImage = AVAILABLE_CARDS_BG[idx % AVAILABLE_CARDS_BG.length];
             const cardName = `${link.alias}.privatepay.me`;
@@ -122,7 +135,7 @@ export default function PaymentLinks() {
                       <Icons.copy className="size-4" />
                     </button>
                     <button
-                      onClick={() => handleDeleteLink(link.alias)}
+                      onClick={() => handleDeleteLink(link.id)}
                       className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500/80 backdrop-blur-sm rounded-full p-2"
                     >
                       <Icons.close className="size-4 text-white" />
