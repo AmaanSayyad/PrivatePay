@@ -149,12 +149,13 @@ export async function registerUser(userData) {
   }
 
   try {
-    const response = await photonAPI.post('/users/register', {
-      jwt: userData.jwt,
-      // Include additional user data if provided
-      ...(userData.userId && { user_id: userData.userId }),
-      ...(userData.email && { email: userData.email }),
-      ...(userData.name && { name: userData.name }),
+    // Photon API format: POST /identity/register
+    const response = await photonAPI.post('/identity/register', {
+      provider: 'jwt',
+      data: {
+        token: userData.jwt,
+        ...(userData.userId && { client_user_id: userData.userId }),
+      }
     });
 
     return response.data;
@@ -203,7 +204,8 @@ export async function sendRewardedEvent(eventData) {
       metadata: eventData.metadata || {},
     };
 
-    const response = await photonAPI.post('/campaigns/events/rewarded', payload, {
+    // Photon API format: POST /attribution/events/campaign
+    const response = await photonAPI.post('/attribution/events/campaign', payload, {
       headers: {
         Authorization: `Bearer ${eventData.accessToken}`,
       },
@@ -256,7 +258,8 @@ export async function sendUnrewardedEvent(eventData) {
       metadata: eventData.metadata || {},
     };
 
-    const response = await photonAPI.post('/campaigns/events/unrewarded', payload, {
+    // Photon API format: POST /attribution/events/campaign (same endpoint for both)
+    const response = await photonAPI.post('/attribution/events/campaign', payload, {
       headers: {
         Authorization: `Bearer ${eventData.accessToken}`,
       },

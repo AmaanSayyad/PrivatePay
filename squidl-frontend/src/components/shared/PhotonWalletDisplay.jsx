@@ -16,14 +16,24 @@
 
 import { usePhoton } from '../../providers/PhotonProvider';
 import { Icons } from './Icons';
-import { Spinner } from '@nextui-org/react';
-import { useState } from 'react';
+import { Spinner, Button } from '@nextui-org/react';
+import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import PhotonErrorBoundary from './PhotonErrorBoundary';
+import { useAptos } from '../../providers/AptosProvider';
 
 function PhotonWalletDisplayInner() {
   const { photonUser, isAuthenticated, walletAddress, isLoading, isEnabled, isDemo } = usePhoton();
+  const { account } = useAptos();
   const [copied, setCopied] = useState(false);
+  const [username, setUsername] = useState('');
+
+  useEffect(() => {
+    if (account) {
+      const savedUsername = localStorage.getItem(`aptos_username_${account}`);
+      setUsername(savedUsername || account.slice(2, 8));
+    }
+  }, [account]);
 
   // Graceful degradation: Don't render if Photon is not configured
   if (!isEnabled) {
@@ -111,9 +121,54 @@ function PhotonWalletDisplayInner() {
   }
 
   if (!isAuthenticated || !photonUser) {
+    // Don't show onboarding if user hasn't connected Aptos wallet
+    if (!account) {
+      return null;
+    }
+
+    const { registerWithPhoton } = usePhoton();
+    const [isRegistering, setIsRegistering] = useState(false);
+
+    const handleConnect = async () => {
+      setIsRegistering(true);
+      try {
+        await registerWithPhoton({
+          userId: account,
+          email: `${username || account.slice(2, 8)}@privatepay.me`,
+          name: username || account.slice(2, 8)
+        });
+        toast.success('Successfully connected to Photon!', {
+          icon: '🎉',
+          duration: 3000,
+        });
+      } catch (error) {
+        console.error('Photon registration error:', error);
+        toast.error(error.message || 'Failed to connect with Photon');
+      } finally {
+        setIsRegistering(false);
+      }
+    };
+
     return (
-      <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-neutral-200">
-        <p className="text-sm text-gray-500">No Photon wallet connected</p>
+      <div className="flex flex-col items-center justify-center gap-4 p-6 bg-white rounded-2xl border border-neutral-200">
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary-50">
+            <WalletIcon className="w-6 h-6 text-primary" />
+          </div>
+          <h3 className="text-sm font-semibold text-gray-800">Photon Rewards</h3>
+          <p className="text-xs text-center text-gray-500">
+            Connect to Photon to earn PAT tokens for your activities
+          </p>
+        </div>
+        <Button
+          onClick={handleConnect}
+          isLoading={isRegistering}
+          isDisabled={isRegistering}
+          className="w-full bg-primary text-white rounded-full h-12"
+          size="lg"
+        >
+          Connect Photon Wallet
+        </Button>
       </div>
     );
   }
